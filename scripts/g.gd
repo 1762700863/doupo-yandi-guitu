@@ -38,7 +38,7 @@ func portrait(name:String) -> Texture2D:
 # ------------------------------------------------------------ 设置
 func _default_settings() -> void:
 	settings = {
-		"vol_master": 0.8, "vol_music": 0.6, "vol_sfx": 0.8, "vol_voice": 0.9,
+		"vol_master": 0.8, "vol_music": 0.3, "vol_sfx": 0.8, "vol_voice": 0.9,
 		"fx": 1.0, "shake": true, "hitstop": true, "dmgnum": true,
 		"fullscreen": false, "fps": 144, "keys": {},
 	}
@@ -162,6 +162,12 @@ func load_meta() -> void:
 						settings[sk] = data[k][sk]
 				else:
 					meta[k] = data[k]
+	_migrate_settings()
+
+func _migrate_settings() -> void:
+	if int(settings.get("mver", 0)) < 1:
+		settings["mver"] = 1
+		settings["vol_music"] = min(float(settings.get("vol_music", 0.3)), 0.3)
 
 func save_meta() -> void:
 	var data := meta.duplicate(true)

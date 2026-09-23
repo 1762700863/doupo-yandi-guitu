@@ -132,24 +132,16 @@ func _build_floor() -> void:
 				if rng.randf() < 0.5:
 					tile.flip_y()
 			img.blit_rect(tile, Rect2i(0, 0, 64, 64), Vector2i(x, y))
-	# 竞技场外变暗
-	for y in Hh:
-		for x in W:
-			var px := x - pad
-			var py := y - pad
-			var dx: float = max(0.0, max(-px, px - arena.size.x))
-			var dy: float = max(0.0, max(-py, py - arena.size.y))
-			var d := sqrt(dx * dx + dy * dy)
-			if d > 0:
-				var k: float = clampf(d / 90.0, 0, 0.82)
-				var c := img.get_pixel(x, y)
-				img.set_pixel(x, y, c.darkened(k))
 	var spr := Sprite2D.new()
 	spr.texture = ImageTexture.create_from_image(img)
 	spr.centered = false
 	spr.position = arena.position - Vector2(pad, pad)
 	spr.z_index = -20
 	world.add_child(spr)
+	var dark := OuterDark.new()
+	dark.rect = arena
+	dark.z_index = -19
+	world.add_child(dark)
 	var edge := ArenaEdge.new()
 	edge.rect = arena
 	edge.z_index = -19
@@ -1309,3 +1301,20 @@ static func apply_pill(id:String, p) -> void:
 				r["skill_affix"][a] = Rewards.roll_affixes(2)
 	if p:
 		p.recalc()
+
+
+## 竞技场外渐暗（绘制代替逐像素处理，避免进房卡顿黑屏）
+class OuterDark extends Node2D:
+	var rect: Rect2
+	func _draw() -> void:
+		var steps := 10
+		for i in steps:
+			var g := 9.0 * (i + 1)
+			var a := 0.082
+			var r := rect.grow(g - 9.0)
+			var big := 2000.0
+			var c := Color(0, 0, 0, a)
+			draw_rect(Rect2(r.position.x - big, r.position.y - big, r.size.x + big * 2, big), c)
+			draw_rect(Rect2(r.position.x - big, r.end.y, r.size.x + big * 2, big), c)
+			draw_rect(Rect2(r.position.x - big, r.position.y, big, r.size.y), c)
+			draw_rect(Rect2(r.end.x, r.position.y, big, r.size.y), c)

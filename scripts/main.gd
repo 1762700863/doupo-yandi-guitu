@@ -164,14 +164,42 @@ func set_scene(n:Node) -> void:
 	if n:
 		add_child(n)
 		move_child(n, 0)
-	fade.color.a = 1.0
-	var tw := create_tween()
-	tw.tween_property(fade, "color:a", 0.0, 0.35)
+	if not fading:
+		_fade_out()
 
+var fading := false
+var fade_tw: Tween
+var black_t := 0.0
+
+func _fade_out() -> void:
+	if fade_tw and fade_tw.is_valid():
+		fade_tw.kill()
+	fade.color.a = max(fade.color.a, 0.6)
+	fade_tw = create_tween()
+	fade_tw.tween_property(fade, "color:a", 0.0, 0.35)
+
+## 渐黑 → 执行回调 → 无论回调是否切换场景，都保证渐亮（修复黑屏）
 func fade_to(cb:Callable) -> void:
-	var tw := create_tween()
-	tw.tween_property(fade, "color:a", 1.0, 0.25)
-	tw.tween_callback(cb)
+	if fading:
+		return
+	fading = true
+	if fade_tw and fade_tw.is_valid():
+		fade_tw.kill()
+	fade_tw = create_tween()
+	fade_tw.tween_property(fade, "color:a", 1.0, 0.22)
+	fade_tw.tween_callback(func():
+		fading = false
+		cb.call()
+		_fade_out())
+
+func _process(d:float) -> void:
+	# 保险：黑幕停留超过1.2秒自动揭开
+	if fade.color.a > 0.9 and not fading:
+		black_t += d
+		if black_t > 1.2:
+			_fade_out()
+	else:
+		black_t = 0.0
 
 func ui_root() -> Control:
 	var c := Control.new()
@@ -210,7 +238,7 @@ func title_screen() -> void:
 	UI.button(root, "设置", Rect2(130, y, 180, 32), func(): Screens.settings(self, func(): title_screen()), Color(-1, 0, 0), 16)
 	y += 38
 	UI.button(root, "退出", Rect2(130, y, 180, 32), func(): get_tree().quit(), Color(0.6, 0.6, 0.6), 16)
-	UI.label(root, "v0.1.0 · 同人作品，仅供个人娱乐 · 字体：缝合像素字体 (OFL)", Vector2(10, 520), 8, Color(0.6, 0.6, 0.6))
+	UI.label(root, "v0.1.1 · 同人作品，仅供个人娱乐 · 字体：缝合像素字体 (OFL)", Vector2(10, 520), 8, Color(0.6, 0.6, 0.6))
 	UI.label(root, "WASD移动 鼠标瞄准 左键普攻 Q/E/R/F斗技 C/X大招 空格身法 Tab功法面板 Esc暂停 F11全屏", Vector2(0, 500), 8, Color(0.8, 0.75, 0.65), 960, HORIZONTAL_ALIGNMENT_CENTER)
 
 func _start_flow() -> void:

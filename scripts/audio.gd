@@ -27,6 +27,8 @@ func _stream(path:String) -> AudioStream:
 	cache[path] = s
 	return s
 
+const MUSIC_DB := -9.0
+
 func music(name:String) -> void:
 	if name == cur_music:
 		return
@@ -43,7 +45,7 @@ func music(name:String) -> void:
 	music_a.volume_db = -40
 	music_a.play()
 	var tw := create_tween().set_parallel(true)
-	tw.tween_property(music_a, "volume_db", 0.0, 1.2)
+	tw.tween_property(music_a, "volume_db", MUSIC_DB, 1.2)
 	tw.tween_property(music_b, "volume_db", -40.0, 1.2)
 	tw.chain().tween_callback(music_b.stop)
 
