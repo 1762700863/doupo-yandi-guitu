@@ -6,6 +6,7 @@ var b
 var cid := ""
 var data: Dictionary
 var spr: Sprite2D
+var mat: ShaderMaterial
 var mode := "follow"
 var cd := 1.0
 var t := 0.0
@@ -20,10 +21,9 @@ func setup(battle, id:String) -> void:
 	cid = id
 	data = D.companions[id]
 	spr = Sprite2D.new()
-	spr.texture = G.spr(data["spr"])
+	mat = Puppet.apply(spr, data["spr"], 3 if id == "yaolao" else 0)
 	if spr.texture:
-		spr.offset = Vector2(0, -spr.texture.get_height() * 0.5)
-		var s := 44.0 / spr.texture.get_height()
+		var s := 44.0 / Puppet.size_of(spr).y
 		spr.scale = Vector2(s, s)
 	spr.modulate = Color(1, 1, 1, 0.92) if id != "yaolao" else Color(0.85, 0.95, 1, 0.75)
 	add_child(spr)
@@ -78,6 +78,7 @@ func _physics_process(delta:float) -> void:
 	var bob = sin(t * 3) * 3 if cid == "yaolao" else abs(sin(t * 8 * min(1.0, vel.length() / 80))) * 2
 	spr.position.y = -bob - (6 if cid == "yaolao" else 0)
 	spr.scale.x = abs(spr.scale.x) * facing
+	Puppet.tick(mat, delta, t * 8.0, minf(1.0, vel.length() / 160.0), clampf(vel.x / 200.0, -1, 1) * 1.2, facing)
 	queue_redraw()
 
 func _attack(enemy) -> void:

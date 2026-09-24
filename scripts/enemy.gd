@@ -80,14 +80,12 @@ func setup(battle, eid:String, boss:bool, mult:float) -> void:
 		if sname == "__player":
 			sname = D.chars[G.run["char"]]["spr"]
 		spr = Sprite2D.new()
-		spr.texture = G.spr(sname)
+		mat = Puppet.apply(spr, sname)
 		if spr.texture:
-			spr.offset = Vector2(0, -spr.texture.get_height() * 0.5)
-			radius = float(data.get("r", spr.texture.get_width() * 0.3 * scale_base))
+			var osz := Puppet.size_of(spr)
+			radius = float(data.get("r", osz.x * 0.3 * scale_base))
 			if boss:
-				radius = spr.texture.get_width() * 0.28 * scale_base
-		mat = ShaderMaterial.new()
-		mat.shader = preload("res://scripts/flash.gdshader")
+				radius = osz.x * 0.28 * scale_base
 		mat.set_shader_parameter("tint", tint)
 		spr.material = mat
 		add_child(spr)
@@ -572,6 +570,12 @@ func _anim(delta:float) -> void:
 			squ = 1.0 + 0.08 * sin(t * 30)
 		spr.scale = Vector2(facing * sc * squ, sc / squ)
 		spr.position.y = -bob
+		var ln := 0.0
+		if state in ["windup", "shoot_wind", "cast_wind", "dash_wind"] or casting != "":
+			ln = -2.0 * facing     # 蓄力后仰
+		elif state == "dashing":
+			ln = 3.0 * facing
+		Puppet.tick(mat, delta, walk, 0.0 if dormant else minf(1.0, vel.length() / maxf(40.0, spd)), ln, facing)
 		var f := flash
 		var fc := Color(1, 1, 1)
 		if freeze > 0:
@@ -615,7 +619,7 @@ func _draw() -> void:
 		draw_circle(Vector2(radius * 0.3 * facing, h - 2), 2, Color(0.1, 0, 0))
 	# 状态图标
 	if not is_boss:
-		var y = -radius * 2.4 - (spr.texture.get_height() * 0.6 * scale_base if spr and spr.texture else 10)
+		var y = -radius * 2.4 - (Puppet.size_of(spr).y * 0.6 * scale_base if spr and spr.texture else 10)
 		if hp < hp_max:
 			var bw := max(20.0, radius * 2)
 			draw_rect(Rect2(-bw / 2, y, bw, 3), Color(0, 0, 0, 0.7))

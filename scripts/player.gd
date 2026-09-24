@@ -64,17 +64,13 @@ func setup(battle, char_id:String) -> void:
 				skin_spr = s["spr"]
 	if G.run.get("chapter", 1) == 0 and cid == "xiaoyan":
 		skin_spr = "yandi"
-	spr.texture = G.spr(skin_spr)
-	spr.centered = true
+	mat = Puppet.apply(spr, skin_spr, 0)
 	if spr.texture:
-		spr.offset = Vector2(0, -spr.texture.get_height() * 0.5)
-		shadow_r = min(26.0, spr.texture.get_width() * 0.28)
-		if spr.texture.get_width() > 90:
+		var osz := Puppet.size_of(spr)
+		shadow_r = min(26.0, osz.x * 0.28)
+		if osz.x > 90:
 			spr.scale = Vector2(0.72, 0.72)
 			shadow_r *= 0.72
-	mat = ShaderMaterial.new()
-	mat.shader = preload("res://scripts/flash.gdshader")
-	spr.material = mat
 	add_child(spr)
 	recalc()
 	var saved_hp: float = float(G.run.get("hp", -1))
@@ -625,11 +621,13 @@ func _anim(delta:float) -> void:
 	var lean := clampf(vel.x / 200.0, -1, 1) * 0.12
 	var sx := facing * (1.0 + squash * 0.12)
 	var sy = 1.0 - squash * 0.1 + abs(sin(walk_t)) * 0.04
-	var base_scale := 0.72 if spr.texture and spr.texture.get_width() > 90 else 1.0
+	var base_scale := 0.72 if spr.texture and Puppet.size_of(spr).x > 90 else 1.0
 	if cid == "medusa" and special_on:
 		base_scale *= 1.15
 	spr.scale = Vector2(sx, sy) * base_scale
-	spr.rotation = lean
+	spr.rotation = lean * 0.25
+	var spd: float = maxf(1.0, float(st.get("speed", 200.0)))
+	Puppet.tick(mat, delta, walk_t, vel.length() / spd, clampf(vel.x / spd, -1, 1) * 1.5 + squash * 3.0 * signf(aim.x), facing)
 	spr.position = Vector2(0, -bob - fly_h)
 	var fl := hurt_flash
 	var fc := Color(1, 0.2, 0.2)

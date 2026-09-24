@@ -245,6 +245,8 @@ func _autotest() -> void:
 			G.new_run(c, int(args.get("ch", "1")), D.chars[c]["atks"][0], "yaolao", 1, [])
 			G.run["zone"] = Flow.new_zone_state(int(args.get("ch", "1")), int(args.get("zi", "0")))
 			Flow.enter_zone(self)
+			if args.has("walk"):
+				Input.action_press(args["walk"])
 			if args.has("tp"):
 				await get_tree().create_timer(1.0).timeout
 				var ex = current
