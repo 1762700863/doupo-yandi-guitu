@@ -11,8 +11,8 @@ var leaves: Array = []
 var topbar: Control
 const LAYOUT := {
 	"alchemy": Vector2(120, 170), "library": Vector2(330, 130), "train": Vector2(560, 170),
-	"tower": Vector2(790, 110), "forge": Vector2(110, 330), "inn": Vector2(320, 340),
-	"codex": Vector2(560, 340), "challenge": Vector2(780, 340), "gate": Vector2(480, 440),
+	"tower": Vector2(790, 146), "forge": Vector2(110, 322), "inn": Vector2(310, 322),
+	"codex": Vector2(610, 322), "challenge": Vector2(810, 322), "gate": Vector2(460, 448),
 }
 
 func _ready() -> void:
@@ -30,7 +30,6 @@ func _ready() -> void:
 func _build_ui() -> void:
 	var root: Control = m.ui_root()
 	topbar = root
-	_refresh_top()
 	for id in LAYOUT:
 		var sz := Vector2(150, 190) if id == "tower" else (Vector2(150, 120) if id == "gate" else Vector2(160, 110))
 		var r := Rect2(LAYOUT[id] - sz / 2, sz)
@@ -50,6 +49,7 @@ func _build_ui() -> void:
 		root.add_child(b)
 		if id == "gate":
 			b.call_deferred("grab_focus")
+	_refresh_top()   # 顶栏最后添加 → 位于建筑按钮之上，点击“设置/标题”不会穿透到建筑
 	# 首次进入提示
 	if int(G.meta["runs"]) == 0 and not ("hub_intro" in G.meta["story_seen"]):
 		G.meta["story_seen"].append("hub_intro")
@@ -120,11 +120,15 @@ func _draw() -> void:
 		var name: String = "出征 · 城门" if id == "gate" else D.buildings[id]["n"]
 		var sub := "" if id == "gate" else ("未建造" if locked else "Lv.%d" % lv)
 		var ly := r.end.y + 2
-		var w := font.get_string_size(name, HORIZONTAL_ALIGNMENT_LEFT, -1, 12).x + 16
-		draw_rect(Rect2(r.get_center().x - w / 2, ly, w, 18), Color(0, 0, 0, 0.65 if hov else 0.45))
-		draw_string(font, Vector2(r.get_center().x - w / 2, ly + 14), name, HORIZONTAL_ALIGNMENT_CENTER, w, 12, Color(1, 0.85, 0.4) if hov else Color(0.95, 0.9, 0.8))
+		# 名称与等级放在同一行标签里（避免小字看不清、与其它建筑重叠）
+		var nw := font.get_string_size(name, HORIZONTAL_ALIGNMENT_LEFT, -1, 13).x
+		var sw := 0.0 if sub == "" else font.get_string_size(sub, HORIZONTAL_ALIGNMENT_LEFT, -1, 11).x + 8
+		var w := nw + sw + 16
+		var lx := r.get_center().x - w / 2
+		draw_rect(Rect2(lx, ly, w, 20), Color(0, 0, 0, 0.7 if hov else 0.55))
+		draw_string(font, Vector2(lx + 8, ly + 15), name, HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Color(1, 0.85, 0.4) if hov else Color(0.95, 0.9, 0.8))
 		if sub != "":
-			draw_string(font, Vector2(r.get_center().x - 40, ly + 28), sub, HORIZONTAL_ALIGNMENT_CENTER, 80, 8, Color(0.7, 0.8, 1) if not locked else Color(0.6, 0.6, 0.6))
+			draw_string(font, Vector2(lx + 8 + nw + 8, ly + 15), sub, HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color(0.6, 0.85, 1) if not locked else Color(0.62, 0.62, 0.62))
 		if id == "gate":
 			var gl := 0.5 + 0.5 * sin(t * 3)
 			draw_arc(r.get_center() + Vector2(0, 10), 50 + gl * 6, PI, TAU, 24, Color(1, 0.7, 0.3, 0.3 + gl * 0.3), 3)
@@ -520,10 +524,7 @@ func _challenge_panel() -> void:
 			var c: String = G.meta.get("last_char", "xiaoyan")
 			G.new_run(c, 2, D.chars[c]["atks"][0], "", int(G.meta.get("diff", 1)), [], "bossrush")
 			G.run["realm"] = 8
-			Flow.enter_room(m, {"type": "bossrush", "biome": "yunlan"}, func(res):
-				if res == "win":
-					G.run["crystal_earned"] = 300
-				Flow.results(m, res == "win")))
+			Flow.start_bossrush(m))
 
 # ---------------------------------------------------------------- 出征
 var sel := {}
@@ -663,12 +664,8 @@ func _start_run() -> void:
 	Au.sfx("door")
 	if sel["mode"] == "endless":
 		G.new_run(sel["char"], 2, sel["atk"], sel["comp"], sel["diff"], sel["tj"].duplicate(), "endless")
-		m.fade_to(func():
-			Flow.enter_room(m, {"type": "endless", "biome": "lava"}, func(res):
-				Flow.results(m, false)))
+		m.fade_to(Flow.start_endless.bind(m))
 		return
 	var chap: int = sel["chapter"]
 	G.new_run(sel["char"], chap, sel["atk"], sel["comp"], sel["diff"], sel["tj"].duplicate())
-	m.fade_to(func():
-		m.set_scene(StoryBG.make(D.chapters[chap]["biome"]))
-		Dialog.play(m, "ch%d_start" % chap, func(): Flow.show_map(m)))
+	m.fade_to(Flow.start_chapter.bind(m, chap))

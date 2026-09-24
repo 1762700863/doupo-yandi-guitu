@@ -21,14 +21,14 @@ static func info(m, title:String, body:String, col:Color, done:Callable) -> void
 	var b := UI.button(p, "继续", Rect2(190, 210, 120, 30), func(): _close(root, done), col, 12)
 	b.grab_focus()
 
-static func confirm(m, title:String, body:String, yes:String, no:String, cb:Callable) -> void:
+static func confirm(m, title:String, body:String, yes:String, no:String, cb:Callable, focus_no:bool=false) -> void:
 	var root := _bg(m)
 	var p := UI.panel(root, Rect2(230, 150, 500, 240))
 	UI.label(p, title, Vector2(0, 16), 24, UI.theme_cols()["accent"], 500, HORIZONTAL_ALIGNMENT_CENTER)
 	UI.label(p, body, Vector2(30, 64), 12, Color(0.95, 0.92, 0.85), 440)
 	var b := UI.button(p, yes, Rect2(90, 190, 140, 30), func(): _close(root, func(): cb.call(true)), Color(1, 0.7, 0.3))
-	UI.button(p, no, Rect2(270, 190, 140, 30), func(): _close(root, func(): cb.call(false)))
-	b.grab_focus()
+	var nb := UI.button(p, no, Rect2(270, 190, 140, 30), func(): _close(root, func(): cb.call(false)))
+	(nb if focus_no else b).grab_focus()
 
 # ---------------------------------------------------------------- 奖励三选一
 static func choose_reward(m, opts:Array, title:String, done:Callable) -> void:

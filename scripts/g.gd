@@ -201,6 +201,17 @@ func clear_run() -> void:
 	if FileAccess.file_exists(RUN_PATH):
 		DirAccess.remove_absolute(ProjectSettings.globalize_path(RUN_PATH))
 
+func has_progress() -> bool:
+	return bool(meta.get("prologue_done", false)) or int(meta.get("runs", 0)) > 0 or has_run()
+
+## 新游戏：清空全部进度（保留设置）
+func reset_all() -> void:
+	run = {}
+	if FileAccess.file_exists(RUN_PATH):
+		DirAccess.remove_absolute(ProjectSettings.globalize_path(RUN_PATH))
+	meta = default_meta()
+	save_meta()
+
 func has_run() -> bool:
 	return FileAccess.file_exists(RUN_PATH)
 

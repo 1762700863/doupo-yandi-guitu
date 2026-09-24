@@ -32,6 +32,127 @@ func _ready() -> void:
 	_autotest()
 
 var args_g := {}
+# ---- 真实鼠标点击测试（模拟用户操作路径）
+func _scene_name() -> String:
+	if current == null: return "null"
+	var sc = current.get_script()
+	return sc.get_global_name() if sc else current.get_class()
+
+func _find_btn(txt:String) -> Button:
+	var all := []
+	_collect_btns(ui_layer, all)
+	for i in range(all.size() - 1, -1, -1):
+		if all[i].text == txt or all[i].text.begins_with(txt):
+			return all[i]
+	return null
+
+func _click_at(pos:Vector2) -> void:
+	var wp := pos * (Vector2(get_window().size) / Vector2(960, 540))
+	var mv := InputEventMouseMotion.new()
+	mv.position = wp
+	mv.global_position = wp
+	Input.parse_input_event(mv)
+	await get_tree().process_frame
+	for pr in [true, false]:
+		var ev := InputEventMouseButton.new()
+		ev.button_index = MOUSE_BUTTON_LEFT
+		ev.pressed = pr
+		ev.position = wp
+		ev.global_position = wp
+		Input.parse_input_event(ev)
+		await get_tree().process_frame
+		await get_tree().process_frame
+
+func _click(txt:String) -> bool:
+	var b := _find_btn(txt)
+	if b == null:
+		print("CT FAIL no button [", txt, "] scene=", _scene_name())
+		return false
+	await _click_at(b.get_global_rect().get_center())
+	await get_tree().create_timer(0.6).timeout
+	return true
+
+func _ct_dialogs(maxn:int=60) -> void:
+	for i in maxn:
+		if get_tree().get_nodes_in_group("dialog").is_empty():
+			return
+		await _click_at(Vector2(480, 470))
+		await get_tree().create_timer(0.25).timeout
+
+func _ct_shot(args:Dictionary, tag:String) -> void:
+	if args.has("shotdir"):
+		await RenderingServer.frame_post_draw
+		get_viewport().get_texture().get_image().save_png(args["shotdir"] + "/" + tag + ".png")
+
+func _clicktest(args:Dictionary) -> void:
+	var mode: String = args.get("mode", "legacy_new")
+	# 模拟旧版本遗留存档：序章已通关、出征过2次、无未完成征途
+	G.reset_all()
+	if mode != "fresh":
+		G.meta["prologue_done"] = true
+		G.meta["runs"] = 2
+		G.save_meta()
+	title_screen()
+	await get_tree().create_timer(1.0).timeout
+	print("CT title buttons: 继续=", _find_btn("继续游戏") != null, " 新=", _find_btn("新游戏") != null)
+	await _ct_shot(args, "01_title")
+	if mode == "legacy_continue" or mode == "launch_only":
+		await _click("继续游戏")
+		await get_tree().create_timer(1.0).timeout
+		print("CT after 继续游戏 scene=", _scene_name())
+		await _ct_dialogs()
+	if mode == "legacy_continue":
+		# 设置按钮不能穿透到建筑
+		await _click("设置")
+		await get_tree().create_timer(0.5).timeout
+		print("CT after 设置: settings_open=", _find_btn("返回") != null or _find_btn("关闭") != null, " building_panel=", _find_btn("升级建筑") != null)
+		await _ct_shot(args, "02_settings")
+		if not await _click("返回"):
+			await _click("关闭")
+		await get_tree().create_timer(0.5).timeout
+		await _click("标题")
+		await get_tree().create_timer(1.0).timeout
+		print("CT after 标题 scene=", _scene_name())
+		await _click("继续游戏")
+	if mode == "legacy_continue" or mode == "launch_only":
+		await get_tree().create_timer(1.0).timeout
+		# 城门 → 出征
+		var hs = current
+		await _click_at(hs.bld_rects["gate"].get_center())
+		await get_tree().create_timer(0.8).timeout
+		await _ct_shot(args, "03_launch")
+		await _click("出　征")
+		await get_tree().create_timer(1.5).timeout
+		print("CT after 出征 scene=", _scene_name(), " dialogs=", get_tree().get_nodes_in_group("dialog").size())
+		await _ct_dialogs()
+		await get_tree().create_timer(1.5).timeout
+		print("CT after ch dialog scene=", _scene_name())
+		await _ct_shot(args, "04_map")
+		if current is MapScene:
+			var pos: Vector2
+			if G.run["map"]["type"] == "branch":
+				pos = current.nodes_pos["0_0"]
+			else:
+				pos = current.nodes_pos["door_0"].get_center()
+			await _click_at(pos)
+			await get_tree().create_timer(1.5).timeout
+			print("CT after map click scene=", _scene_name())
+			await _ct_shot(args, "05_room")
+	else:
+		await _click("新游戏")
+		await get_tree().create_timer(0.5).timeout
+		if mode != "fresh":
+			await _ct_shot(args, "02_confirm")
+			await _click("清除并开始")
+		await get_tree().create_timer(1.5).timeout
+		print("CT after 新游戏 scene=", _scene_name(), " prologue_done=", G.meta["prologue_done"], " runs=", G.meta["runs"], " dialogs=", get_tree().get_nodes_in_group("dialog").size(), " run_ch=", G.run.get("chapter", -1))
+		await _ct_shot(args, "03_prologue")
+		await _ct_dialogs()
+		await get_tree().create_timer(1.5).timeout
+		print("CT after prologue dialog scene=", _scene_name())
+		await _ct_shot(args, "04_fight")
+	print("CT_DONE")
+
 func _collect_btns(n:Node, out:Array) -> void:
 	for c in n.get_children():
 		if c is Button and c.is_visible_in_tree() and not c.disabled:
@@ -117,6 +238,8 @@ func _autotest() -> void:
 	match sc:
 		"hub":
 			hub()
+		"clicktest":
+			await _clicktest(args)
 		"chclear":
 			G.new_run(c, 1, D.chars[c]["atks"][0], "yaolao", 1, [])
 			Flow.show_map(self)
@@ -331,40 +454,40 @@ func title_screen() -> void:
 	Au.music("hub")
 	var root := ui_root()
 	var y := 290.0
-	var has_run := G.has_run()
-	var first: Button
-	if has_run:
+	var progress := G.has_progress()
+	var first: Button = null
+	# 继续游戏：有任何进度就显示（有未完成的一局→回到地图；否则→回到基地）
+	if progress:
 		first = UI.button(root, "继续游戏", Rect2(130, y, 180, 34), func(): _continue_run(), Color(1, 0.75, 0.3), 16)
-		var r_info := _run_summary()
-		if r_info != "":
-			UI.label(root, r_info, Vector2(320, y + 8), 12, Color(0.9, 0.85, 0.7))
-		y += 40
+		UI.label(root, _run_summary(), Vector2(322, y + 8), 12, Color(0.9, 0.85, 0.7))
+		y += 42
+	# 新游戏：总是从序章（萧炎成为炎帝）开始；有进度时先确认并清空全部存档
 	var nb := UI.button(root, "新游戏", Rect2(130, y, 180, 34), func():
-		if has_run:
-			Screens.confirm(self, "开始新的征途？", "当前有一局未完成的征途（已自动保存）。\n开始新征途将放弃它（结算已获得的奖励）。", "放弃并开始", "取消", func(yes):
+		if progress:
+			Screens.confirm(self, "开始新游戏？", "将清除全部存档进度（基地建筑、天赋、解锁角色、异火、成就、未完成的征途），\n从序章重新开始。设置会保留。此操作不可撤销！", "清除并开始", "取消", func(yes):
 				if yes:
-					G.clear_run()
-					_start_flow())
+					G.reset_all()
+					fade_to(func(): _start_prologue()), true)
 		else:
-			_start_flow(), Color(1, 0.6, 0.3), 16)
+			fade_to(func(): _start_prologue()), Color(1, 0.6, 0.3), 16)
 	if first == null:
 		first = nb
-	y += 40
+	y += 42
 	UI.button(root, "设置", Rect2(130, y, 180, 34), func(): Screens.settings(self, func(): title_screen()), Color(-1, 0, 0), 16)
-	y += 40
+	y += 42
 	UI.button(root, "退出游戏", Rect2(130, y, 180, 34), func(): get_tree().quit(), Color(0.6, 0.6, 0.6), 16)
 	first.call_deferred("grab_focus")
-	UI.label(root, "v0.1.2 · 同人作品，仅供个人娱乐 · 字体：霞鹜文楷 / 缝合像素字体 (OFL)", Vector2(10, 520), 8, Color(0.6, 0.6, 0.6))
+	UI.label(root, "v0.1.3 · 同人作品，仅供个人娱乐 · 字体：霞鹜文楷 / 缝合像素字体 (OFL)", Vector2(10, 520), 8, Color(0.6, 0.6, 0.6))
 	UI.label(root, "WASD移动 鼠标瞄准 左键普攻 Q/E/R/F斗技 C/X大招 空格身法 Tab功法面板 Esc暂停 F11全屏", Vector2(0, 500), 8, Color(0.8, 0.75, 0.65), 960, HORIZONTAL_ALIGNMENT_CENTER)
 
 func _run_summary() -> String:
 	var f := FileAccess.open(G.RUN_PATH, FileAccess.READ)
 	if f == null:
-		return ""
+		return "返回%s · 已出征 %d 次" % [G.faction_name(), int(G.meta["runs"])]
 	var d = JSON.parse_string(f.get_as_text())
 	if not (d is Dictionary) or not d.has("char"):
-		return ""
-	return "%s · %s · 第%d层" % [D.chars[d["char"]]["n"], D.chapters[int(d["chapter"])]["t"], int(d.get("floor", 0)) + 1]
+		return "返回%s" % G.faction_name()
+	return "征途中：%s · %s · 第%d层" % [D.chars[d["char"]]["n"], D.chapters[int(d["chapter"])]["t"], int(d.get("floor", 0)) + 1]
 
 func _start_flow() -> void:
 	if not G.meta["prologue_done"]:
@@ -373,10 +496,12 @@ func _start_flow() -> void:
 		fade_to(func(): hub())
 
 func _continue_run() -> void:
-	if G.load_run():
+	if G.has_run() and G.load_run():
 		fade_to(func(): Flow.show_map(self))
+	elif not G.meta["prologue_done"]:
+		fade_to(func(): _start_prologue())
 	else:
-		hub()
+		fade_to(func(): hub())
 
 func _start_prologue() -> void:
 	G.new_run("xiaoyan", 0, "atk_flame", "", 1, [])

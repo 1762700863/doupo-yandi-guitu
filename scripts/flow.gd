@@ -113,6 +113,20 @@ static func _door_options() -> Array:
 	return opts
 
 # ---------------------------------------------------------------- 地图界面
+## 从基地出发（静态函数：回调不能绑定在即将被释放的基地场景上）
+static func start_chapter(m, chap:int) -> void:
+	m.set_scene(StoryBG.make(D.chapters[chap]["biome"]))
+	Dialog.play(m, "ch%d_start" % chap, func(): show_map(m))
+
+static func start_endless(m) -> void:
+	enter_room(m, {"type": "endless", "biome": "lava"}, func(_res): results(m, false))
+
+static func start_bossrush(m) -> void:
+	enter_room(m, {"type": "bossrush", "biome": "yunlan"}, func(res):
+		if res == "win":
+			G.run["crystal_earned"] = 300
+		results(m, res == "win"))
+
 static func show_map(m) -> void:
 	var r: Dictionary = G.run
 	if r.get("map", {}).is_empty():
