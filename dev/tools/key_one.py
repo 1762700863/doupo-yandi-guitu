@@ -23,9 +23,24 @@ for src in sys.argv[2:]:
     if green:
         sub[..., 1] = np.where(edge | part, np.minimum(sub[..., 1], np.maximum(sub[..., 0], sub[..., 2]) + 10), sub[..., 1])
     else:
-        sp = edge & (sub[..., 0] > sub[..., 1] + 25) & (sub[..., 2] > sub[..., 1] + 25) & (np.abs(sub[..., 0] - sub[..., 2]) < 70)
+        near = (edge | part | (mm & ~ndimage.binary_erosion(mm, iterations=6)))
+        sp = near & (sub[..., 0] > sub[..., 1] + 18) & (sub[..., 2] > sub[..., 1] + 18) & (np.abs(sub[..., 0] - sub[..., 2]) < 60)
         g = sub[..., 1]
-        sub[..., 0] = np.where(sp, np.minimum(sub[..., 0], g + 12), sub[..., 0]); sub[..., 2] = np.where(sp, np.minimum(sub[..., 2], g + 12), sub[..., 2])
+        sub[..., 0] = np.where(sp, np.minimum(sub[..., 0], g + 8), sub[..., 0]); sub[..., 2] = np.where(sp, np.minimum(sub[..., 2], g + 8), sub[..., 2])
+    if not green and bg[0] > 180 and bg[2] > 180 and bg[1] < 80:
+        # 全图洋红反解：像素 = (1-f)*主体 + f*洋红底，按洋红含量求 f，还原主体色并降低不透明度
+        r_, g_, b_ = sub[..., 0], sub[..., 1], sub[..., 2]
+        k = np.minimum(r_, b_) - g_
+        cand = (al > 0) & (r_ - g_ > 20) & (b_ - g_ > 20) & (np.abs(r_ - b_) < 60)
+        inner = ndimage.binary_erosion(mm, iterations=8)
+        if (cand & inner).sum() > 0.003 * max(1, inner.sum()):
+            # 角色本身含紫/粉紫色：只在轮廓带内、用严格洋红判定处理，避免误伤衣物
+            band = part | (mm & ~ndimage.binary_erosion(mm, iterations=4))
+            cand = band & (k > 60) & (np.abs(r_ - b_) < 30)
+            print('  [strict-magenta mode]', end='')
+        f = np.where(cand, np.clip(k / (min(bg[0], bg[2]) - bg[1]), 0, 0.95), 0)
+        sub = np.clip((sub - f[..., None] * bg) / (1 - f[..., None]), 0, 255)
+        al = al * (1 - f)
     rgba = np.dstack([np.clip(sub, 0, 255), al * 255]).astype(np.uint8)
     rgba[..., 3] = np.where(rgba[..., 3] < 16, 0, rgba[..., 3])
     pad = 8; o = np.zeros((rgba.shape[0] + 2 * pad, rgba.shape[1] + 2 * pad, 4), np.uint8); o[pad:-pad, pad:-pad] = rgba
