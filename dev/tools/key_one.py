@@ -41,6 +41,20 @@ for src in sys.argv[2:]:
         f = np.where(cand, np.clip(k / (min(bg[0], bg[2]) - bg[1]), 0, 0.95), 0)
         sub = np.clip((sub - f[..., None] * bg) / (1 - f[..., None]), 0, 255)
         al = al * (1 - f)
+    if green:
+        # 绿底反解：只在靠近透明处（含发丝缝）处理；角色自带绿色时切严格模式
+        r_, g_, b_ = sub[..., 0], sub[..., 1], sub[..., 2]
+        k = g_ - np.maximum(r_, b_)
+        nearT = ndimage.binary_dilation(al < 0.1, iterations=12)
+        cand = (al > 0) & (k > 20) & nearT
+        inner = ndimage.binary_erosion(mm, iterations=8)
+        if ((al > 0) & (k > 20) & inner).sum() > 0.003 * max(1, inner.sum()):
+            band = part | (mm & ~ndimage.binary_erosion(mm, iterations=4))
+            cand = band & (k > 60)
+            print('  [strict-green mode]', end='')
+        f = np.where(cand, np.clip(k / (bg[1] - max(bg[0], bg[2])), 0, 0.95), 0)
+        sub = np.clip((sub - f[..., None] * bg) / (1 - f[..., None]), 0, 255)
+        al = al * (1 - f)
     rgba = np.dstack([np.clip(sub, 0, 255), al * 255]).astype(np.uint8)
     rgba[..., 3] = np.where(rgba[..., 3] < 16, 0, rgba[..., 3])
     pad = 8; o = np.zeros((rgba.shape[0] + 2 * pad, rgba.shape[1] + 2 * pad, 4), np.uint8); o[pad:-pad, pad:-pad] = rgba
