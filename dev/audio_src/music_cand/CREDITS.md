@@ -63,3 +63,50 @@
 | evil-approach | nene | cc0 | https://opengameart.org/content/evil-approach |
 
 ## sounddino/（https://sounddino.com/en/effects/chinese-music/ ，免署名，AI 生成）
+
+## 第 2 批补充（管弦 · Hitctrl / Zhelanov / Matthew Pablo / Dizzy Crow）
+
+| 文件 | 作者 | 许可 | 页面 |
+|---|---|---|---|
+| battle-music-the-battle-of-atheria | Hitctrl | by | https://opengameart.org/content/battle-music-the-battle-of-atheria |
+| rpg-to-arms-battle-music-1 | Hitctrl | by | https://opengameart.org/content/rpg-to-arms-battle-music-1 |
+| finalbosslair | Hitctrl | by | https://opengameart.org/content/finalbosslair |
+| fantasy-the-march-upon-the-red-mountain | Hitctrl | by | https://opengameart.org/content/fantasy-the-march-upon-the-red-mountain |
+| atthegatesofdestiny | Hitctrl | by | https://opengameart.org/content/atthegatesofdestiny |
+| rpg-the-enchanted-forest-of-min | Hitctrl | by | https://opengameart.org/content/rpg-the-enchanted-forest-of-min |
+| rpg-a-long-way-from-home | Hitctrl | by | https://opengameart.org/content/rpg-a-long-way-from-home |
+| fantasy-music-the-elven-groves | Hitctrl | by | https://opengameart.org/content/fantasy-music-the-elven-groves |
+| rpg-piano-theme-1 | Hitctrl | by | https://opengameart.org/content/rpg-piano-theme-1 |
+| adrift-on-the-currents-of-time-main-menu-music | Hitctrl | by | https://opengameart.org/content/adrift-on-the-currents-of-time-main-menu-music |
+| rpg-the-cave-ambient | Hitctrl | by | https://opengameart.org/content/rpg-the-cave-ambient |
+| fantasy-music-the-savvy-merchant | Hitctrl | by | https://opengameart.org/content/fantasy-music-the-savvy-merchant |
+| fantasy-music-the-mourning-forest | Hitctrl | by | https://opengameart.org/content/fantasy-music-the-mourning-forest |
+| journey-to-aries-peak | Hitctrl | by | https://opengameart.org/content/journey-to-aries-peak |
+| battle-music | Alexandr Zhelanov | by | https://opengameart.org/content/battle-music |
+| epic-fall | Alexandr Zhelanov | by | https://opengameart.org/content/epic-fall |
+| brave-soldiers | Alexandr Zhelanov | by | https://opengameart.org/content/brave-soldiers |
+| for-the-king | Alexandr Zhelanov | by | https://opengameart.org/content/for-the-king |
+| confrontation-0 | Alexandr Zhelanov | by | https://opengameart.org/content/confrontation-0 |
+| darkness-march | Alexandr Zhelanov | by | https://opengameart.org/content/darkness-march |
+| air | Alexandr Zhelanov | by | https://opengameart.org/content/air |
+| full-of-memories | Alexandr Zhelanov | by | https://opengameart.org/content/full-of-memories |
+| caves-of-sorrow | Alexandr Zhelanov | by | https://opengameart.org/content/caves-of-sorrow |
+| destiny | Alexandr Zhelanov | by | https://opengameart.org/content/destiny |
+| rpg-battle-theme-the-last-encounter-0 | Matthew Pablo | by-sa | https://opengameart.org/content/rpg-battle-theme-the-last-encounter-0 |
+| heroic-demise-updated-version | Matthew Pablo | by | https://opengameart.org/content/heroic-demise-updated-version |
+| blackmoor-ninjas-battle-theme | Matthew Pablo | by | https://opengameart.org/content/blackmoor-ninjas-battle-theme |
+| leap-into-eternity-live-orchestra | Matthew Pablo | by | https://opengameart.org/content/leap-into-eternity-live-orchestra |
+| soliloquy | Matthew Pablo | by | https://opengameart.org/content/soliloquy |
+| spiritwatcher | Matthew Pablo | by | https://opengameart.org/content/spiritwatcher |
+| tropic-strike-live-orchestra | Matthew Pablo | by | https://opengameart.org/content/tropic-strike-live-orchestra |
+| orchestral-excitement-030 | Dizzy Crow | CC0 | https://opengameart.org/content/orchestral-excitement-030 |
+| epic-transformation-124 | Dizzy Crow | CC0 | https://opengameart.org/content/epic-transformation-124 |
+| homesick-116 | Dizzy Crow | by | https://opengameart.org/content/homesick-116 |
+
+## Silverman Sound（Shane Ivers，CC BY 4.0）
+
+| silverman__all-the-tea-in-china | Shane Ivers | CC BY 4.0 | https://www.silvermansound.com/free-music/all-the-tea-in-china |
+| silverman__imperial-china-cinematic | Shane Ivers | CC BY 4.0 | https://www.silvermansound.com/free-music/imperial-china-cinematic |
+
+## SoundDino（sounddino/ 目录，站方标注 royalty-free / no copyright）
+
