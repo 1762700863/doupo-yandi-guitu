@@ -1,54 +1,74 @@
-# 处理 dev/art_src/*.png -> assets/sprites/<n>.png (像素精灵) + portraits/<n>_full.png (高清立绘 ~420px) + portraits/<n>.png (头像)
+# 处理 dev/art_src/<n>.png（纯色背景的全身立绘）→
+#   assets/sprites/<n>.png        像素精灵（按 H 表高度，BOX 缩小 + 深色描边）
+#   assets/portraits/<n>_full.png 高清立绘（高 420，柔和抗锯齿边缘）
+#   assets/portraits/<n>.png      头像（头部 128×128）
+# 抠图：按与背景色（边框中位数）的颜色距离 → 柔和 alpha；兼容品红/浅粉/绿幕；去背景混色；残留品红色相淡出
+# AI 偶尔一张图画出多个副本：只保留最左边的主体
 import numpy as np, glob, os, sys
 from PIL import Image
 from scipy import ndimage
-R='/var/tmp/w/repo'
-SRC=R+'/dev/art_src'; OUT=R+'/assets'
-H={'xiaoyan':60,'xuner':58,'medusa':66,'yunyun':60,'xiaoyixian':58,'yaolao':64,'yandi':76,'hun_tiandi':72,'nalan':60,'e_wolf':44,'b_yunshan':64}
-names=sys.argv[1:] or [os.path.basename(f)[:-4] for f in glob.glob(SRC+'/*.png')]
+R = '/var/tmp/w/repo'
+SRC = R + '/dev/art_src'; OUT = R + '/assets'
+H = {'xiaoyan': 60, 'xuner': 58, 'medusa': 66, 'yunyun': 60, 'xiaoyixian': 58, 'yaolao': 64, 'yandi': 70, 'hun_tiandi': 72,
+     'nalan': 60, 'e_wolf': 44, 'b_yunshan': 64}
+names = sys.argv[1:] or [os.path.basename(f)[:-4] for f in glob.glob(SRC + '/*.png') if not os.path.basename(f).startswith('poi_')]
 for n in names:
-    a=np.array(Image.open(f'{SRC}/{n}.png').convert('RGB')).astype(int)
-    r,g,b=a[...,0],a[...,1],a[...,2]
-    bg=np.median(np.concatenate([a[:4].reshape(-1,3),a[-4:].reshape(-1,3),a[:,:4].reshape(-1,3),a[:,-4:].reshape(-1,3)]),axis=0)
-    if bg[1]>bg[0]+60:   # green
-        key=(g>100)&(g>r+45)&(g>b+45)
-        soft=(g>r+20)&(g>b+20)
-    else:                # magenta
-        key=(r>130)&(b>130)&(g<r-60)&(g<b-60)
-        soft=(r>g+30)&(b>g+30)&(abs(r-b)<70)
-    mask=~key
-    mask=ndimage.binary_opening(mask,iterations=1)
-    lab,nl=ndimage.label(ndimage.binary_dilation(mask,iterations=25))
-    sizes=ndimage.sum(mask,lab,range(1,nl+1))
-    k=int(np.argmax(sizes))+1
-    m=mask&(lab==k)
-    # 保留与主体相连的所有小碎片（火焰/丝带）：dilation 25 已合并
-    ys,xs=np.where(m)
-    y0,y1,x0,x1=ys.min(),ys.max()+1,xs.min(),xs.max()+1
-    sub=a[y0:y1,x0:x1].copy(); mm=m[y0:y1,x0:x1]
-    # 去溢色：边缘2px内
-    edge=mm & ~ndimage.binary_erosion(mm,iterations=2)
-    s=soft[y0:y1,x0:x1]&edge
-    if bg[1]>bg[0]+60:
-        sub[...,1]=np.where(s,np.minimum(sub[...,1],np.maximum(sub[...,0],sub[...,2])),sub[...,1])
+    a = np.array(Image.open(f'{SRC}/{n}.png').convert('RGB')).astype(float)
+    bg = np.median(np.concatenate([a[:4].reshape(-1, 3), a[-4:].reshape(-1, 3), a[:, :4].reshape(-1, 3), a[:, -4:].reshape(-1, 3)]), axis=0)
+    green = bg[1] > bg[0] + 60
+    d = np.sqrt(((a - bg) ** 2).sum(-1))
+    alpha = np.clip((d - 38) / 55.0, 0, 1)
+    mask = ndimage.binary_opening(alpha > 0.5, iterations=1)
+    lab, nl = ndimage.label(ndimage.binary_dilation(mask, iterations=25))
+    sizes = ndimage.sum(mask, lab, range(1, nl + 1))
+    big = [i + 1 for i, s in enumerate(sizes) if s > sizes.max() * 0.5]
+    if len(big) > 1:   # 多个副本：取最左
+        big.sort(key=lambda k: np.where(lab == k)[1].min())
+    k = big[0]
+    keep = lab == k
+    m = mask & keep
+    ys, xs = np.where(m)
+    y0, y1, x0, x1 = ys.min(), ys.max() + 1, xs.min(), xs.max() + 1
+    sub = a[y0:y1, x0:x1].copy(); mm = m[y0:y1, x0:x1]
+    al = alpha[y0:y1, x0:x1] * keep[y0:y1, x0:x1]
+    part = (al > 0.02) & (al < 0.999)
+    un = (sub - (1 - al[..., None]) * bg) / np.maximum(al[..., None], 0.02)
+    sub = np.where(part[..., None], np.clip(un, 0, 255), sub)
+    edge = mm & ~ndimage.binary_erosion(mm, iterations=2)
+    if green:
+        sub[..., 1] = np.where(edge, np.minimum(sub[..., 1], np.maximum(sub[..., 0], sub[..., 2]) + 10), sub[..., 1])
     else:
-        mx=np.minimum(sub[...,0],sub[...,2]); 
-        sub[...,0]=np.where(s,np.minimum(sub[...,0],sub[...,1]+30),sub[...,0]); sub[...,2]=np.where(s,np.minimum(sub[...,2],sub[...,1]+30),sub[...,2])
-    rgba=np.zeros(sub.shape[:2]+(4,),np.uint8); rgba[...,:3]=np.clip(sub,0,255); rgba[...,3]=mm*255
-    im=Image.fromarray(rgba,'RGBA')
-    # 高清立绘：高 420，LANCZOS（清晰），加 2px 余量
-    ph=420; pw=round(im.width*ph/im.height)
-    full=im.resize((pw,ph),Image.LANCZOS)
-    fa=np.array(full); fa[...,3]=np.where(fa[...,3]>100,255,0); full=Image.fromarray(fa)
-    pad=Image.new('RGBA',(pw+8,ph+8)); pad.paste(full,(4,4)); pad.save(f'{OUT}/portraits/{n}_full.png')
+        spill = edge & (sub[..., 0] > sub[..., 1] + 40) & (sub[..., 2] > sub[..., 1] + 40) & (np.abs(sub[..., 0] - sub[..., 2]) < 60)
+        sub[..., 0] = np.where(spill, np.minimum(sub[..., 0], sub[..., 1] + 40), sub[..., 0])
+        sub[..., 2] = np.where(spill, np.minimum(sub[..., 2], sub[..., 1] + 40), sub[..., 2])
+        mn = np.minimum(sub[..., 0], sub[..., 2])
+        mag = np.clip((mn - sub[..., 1] - 70) / 60.0, 0, 1) * (np.abs(sub[..., 0] - sub[..., 2]) < 90)
+        al = al * (1 - mag)
+    if n == 'xuner':   # 金帝焚天炎：粉色火焰校正回金色
+        pink = (sub[..., 0] > 190) & (sub[..., 2] > sub[..., 1] + 15) & (sub[..., 0] > sub[..., 2] + 10)
+        sub[..., 2] = np.where(pink, sub[..., 1] * 0.45, sub[..., 2])
+        sub[..., 1] = np.where(pink, np.minimum(255, sub[..., 1] * 1.08 + 18), sub[..., 1])
+    rgba = np.zeros(sub.shape[:2] + (4,), np.uint8)
+    rgba[..., :3] = np.clip(sub, 0, 255); rgba[..., 3] = np.clip(al * 255, 0, 255)
+    # 重新裁掉被淡出的空边
+    ys2, xs2 = np.where(rgba[..., 3] > 40)
+    rgba = rgba[ys2.min():ys2.max() + 1, xs2.min():xs2.max() + 1]
+    im = Image.fromarray(rgba, 'RGBA')
+    # 高清立绘
+    ph = 420; pw = round(im.width * ph / im.height)
+    full = im.resize((pw, ph), Image.LANCZOS)
+    fa = np.array(full); fa[..., 3] = np.where(fa[..., 3] < 20, 0, fa[..., 3]); full = Image.fromarray(fa)
+    pad = Image.new('RGBA', (pw + 8, ph + 8)); pad.paste(full, (4, 4)); pad.save(f'{OUT}/portraits/{n}_full.png')
     # 精灵
-    th=H.get(n,60); w=max(1,round(im.width*th/im.height))
-    sm=im.resize((w,th),Image.BOX); s2=np.array(sm); s2[...,3]=np.where(s2[...,3]>110,255,0)
-    al=s2[...,3]>0; ring=ndimage.binary_dilation(al)&~al; s2[ring]=[20,12,18,255]
-    Image.fromarray(s2,'RGBA').save(f'{OUT}/sprites/{n}.png')
-    # 头像：取头部区域（上 30%，按主体宽度中心裁正方形）
-    hh=int(im.height*0.30); cx=int(np.mean(np.where(mm[:hh])[1])) if mm[:hh].any() else im.width//2
-    side=hh; left=max(0,min(im.width-side,cx-side//2))
-    p=im.crop((left,0,left+side,side)).resize((128,128),Image.LANCZOS)
-    q=np.array(p); q[...,3]=np.where(q[...,3]>100,255,0); Image.fromarray(q).save(f'{OUT}/portraits/{n}.png')
-    print(n,im.size,'-> spr',(w,th),'full',pad.size)
+    base = n.split('_alt')[0]
+    th = H.get(base, 60); w = max(1, round(im.width * th / im.height))
+    sm = im.resize((w, th), Image.BOX); s2 = np.array(sm); s2[..., 3] = np.where(s2[..., 3] > 110, 255, 0)
+    alm = s2[..., 3] > 0; ring = ndimage.binary_dilation(alm) & ~alm; s2[ring] = [20, 12, 18, 255]
+    Image.fromarray(s2, 'RGBA').save(f'{OUT}/sprites/{n}.png')
+    # 头像：头部区域（上 28%，按不透明像素中心裁正方形）
+    A = np.array(im)[..., 3] > 100
+    hh = int(im.height * 0.28); cx = int(np.mean(np.where(A[:hh])[1])) if A[:hh].any() else im.width // 2
+    side = hh; left = max(0, min(im.width - side, cx - side // 2))
+    p = im.crop((left, 0, left + side, side)).resize((128, 128), Image.LANCZOS)
+    q = np.array(p); q[..., 3] = np.where(q[..., 3] < 20, 0, q[..., 3]); Image.fromarray(q).save(f'{OUT}/portraits/{n}.png')
+    print(n, im.size, '-> spr', (w, th), 'full', pad.size)
