@@ -63,6 +63,15 @@ for n in names:
         mn = np.minimum(sub[..., 0], sub[..., 2])
         mag = np.clip((mn - sub[..., 1] - 70) / 60.0, 0, 1) * (np.abs(sub[..., 0] - sub[..., 2]) < 90)
         al = al * (1 - mag)
+    if n in ('yunyun', 'yaolao'):   # 半透明风环/魂光被品红底污染 → 还原为冷白色
+        R, G, B = sub[..., 0], sub[..., 1], sub[..., 2]
+        hz = (R > G + 12) & (B > G + 12) & (R >= B * 0.75) & (B >= R * 0.6)
+        if n == 'yaolao':
+            solid = ndimage.binary_erosion(al > 0.5, iterations=14)
+            hz = hz & ~solid
+        L = (R * 0.3 + G * 0.5 + B * 0.2)
+        L = np.clip(L * 1.05 + 20, 0, 255)
+        sub[..., 0] = np.where(hz, L * 0.90, R); sub[..., 1] = np.where(hz, L * 0.96, G); sub[..., 2] = np.where(hz, np.minimum(255, L * 1.02 + 6), B)
     if n == 'xuner':   # 金帝焚天炎：粉色火焰校正回金色
         pink = (sub[..., 0] > 190) & (sub[..., 2] > sub[..., 1] + 15) & (sub[..., 0] > sub[..., 2] + 10)
         sub[..., 2] = np.where(pink, sub[..., 1] * 0.45, sub[..., 2])
