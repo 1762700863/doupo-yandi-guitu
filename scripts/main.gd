@@ -150,6 +150,7 @@ func _collect_btns(n:Node, out:Array) -> void:
 			out.append(c)
 		_collect_btns(c, out)
 
+var last_state := ""
 func _autoplay() -> void:
 	while true:
 		await get_tree().create_timer(0.35, true, false, true).timeout
@@ -177,6 +178,10 @@ func _autoplay() -> void:
 							Input.action_press(a)
 						else:
 							Input.action_release(a)
+		var sn := _scene_name() + "|" + str(G.run.get("zone", {}).get("done", [])) + "|" + str(G.run.get("arts", [])) + str(G.run.get("ults", [])) + "|" + str(G.run.get("move", ""))
+		if sn != last_state:
+			last_state = sn
+			print("STATE ", sn)
 		for d in get_tree().get_nodes_in_group("dialog"):
 			d._advance()
 		if get_tree().get_nodes_in_group("dialog").size() > 0:
@@ -206,7 +211,7 @@ func _autoplay() -> void:
 					break
 		if pick == null:
 			for bt in btns:
-				if not (bt.text in ["设置", "标题", "功法", "退出游戏", "放弃本局", "+10", "+30", "+100"]):
+				if not (bt.text in ["再看看", "设置", "标题", "功法", "退出游戏", "放弃本局", "+10", "+30", "+100"]):
 					pick = bt
 					break
 		if pick:
@@ -246,6 +251,9 @@ func _autotest() -> void:
 				for po in ex.pois:
 					if po["t"] == args["tp"]:
 						ex.player.global_position = po["p"] + Vector2(0, 40)
+						if args.has("use"):
+							await get_tree().create_timer(0.5).timeout
+							ex._use_poi(po)
 						break
 		"battle", "boss", "elite":
 			G.new_run(c, int(args.get("ch", "1")), D.chars[c]["atks"][0], args.get("comp", "yaolao"), 1, [])

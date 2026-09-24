@@ -44,12 +44,17 @@ func setup_zone(m, zid:String) -> void:
 func _ready() -> void:
 	cleared = true   # 探索场景没有“清房间结束”的概念
 	super._ready()
+	_paint_roads()
 	# 玩家位置：存档位置或区域起点
 	var sp: Array = zdef.get("start", [0.5, 0.9])
 	start_pos = Vector2(arena.size.x * float(sp[0]), arena.size.y * float(sp[1]))
 	var pos := start_pos
 	if zst.has("pos") and zst["pos"] is Array and zst["pos"].size() == 2:
 		pos = Vector2(float(zst["pos"][0]), float(zst["pos"][1]))
+	# 从洞穴/对决返回时不要站在入口上（会挡住名字并立刻再次触发）
+	for po in pois:
+		if po["p"].distance_to(pos) < float(po["r"]) + 40.0:
+			pos = po["p"] + Vector2(0, float(po["r"]) + 56.0)
 	player.position = pos
 	if comp:
 		comp.position = pos + Vector2(-40, 10)
@@ -71,6 +76,70 @@ func _ready() -> void:
 		zst["intro"] = true
 		H.banner(zdef["n"], Color(1, 0.85, 0.5))
 	G.save_run()
+
+# ---------------------------------------------------------------- 道路
+const MASK_K := 8.0   # 遮罩 1 像素 = 8 世界像素
+
+func _paint_roads() -> void:
+	if ground_mat == null:
+		return
+	var pad := 256.0
+	var org := arena.position - Vector2(pad, pad)
+	var msz := arena.size + Vector2(pad * 2, pad * 2)
+	var W := int(ceil(msz.x / MASK_K))
+	var Hh := int(ceil(msz.y / MASK_K))
+	var data := PackedByteArray()
+	data.resize(W * Hh)
+	var town: bool = zdef["kind"] == "town"
+	var rng := _rng(99)
+	var half := (30.0 if town else 22.0) / MASK_K
+	for sgm in paths:
+		var a: Vector2 = (sgm[0] - org) / MASK_K
+		var b2: Vector2 = (sgm[1] - org) / MASK_K
+		var L := a.distance_to(b2)
+		var nrm := (b2 - a).normalized().orthogonal()
+		var amp := minf(L * 0.08, 5.0) if not town else 0.0
+		var ph := rng.randf() * TAU
+		var steps := int(L * 1.5) + 2
+		for i in steps + 1:
+			var tt := float(i) / steps
+			var c := a.lerp(b2, tt) + nrm * sin(tt * PI) * amp * sin(ph + tt * 3.0)
+			_stamp(data, W, Hh, c, half)
+	if town:
+		var y0: float = arena.size.y * 0.47
+		var r0 := Rect2((Vector2(60, y0 - 46) - org) / MASK_K, Vector2(arena.size.x - 120, 138) / MASK_K)
+		for yy in range(int(r0.position.y) - 3, int(r0.end.y) + 4):
+			for xx in range(int(r0.position.x) - 3, int(r0.end.x) + 4):
+				if xx < 0 or yy < 0 or xx >= W or yy >= Hh:
+					continue
+				var dx := maxf(r0.position.x - xx, xx - r0.end.x)
+				var dy := maxf(r0.position.y - yy, yy - r0.end.y)
+				var dd := maxf(dx, dy)
+				var v := int(clampf(1.0 - (dd + 2.0) / 5.0, 0.0, 1.0) * 255.0) if dd > -3 else 255
+				var k := yy * W + xx
+				data[k] = maxi(data[k], v)
+	var img := Image.create_from_data(W, Hh, false, Image.FORMAT_L8, data)
+	ground_mat.set_shader_parameter("roads", ImageTexture.create_from_image(img))
+	var rt: String = {"desert": "road_sand", "lava": "road_ash", "void": "road_ash", "yunlan": "road_marble"}.get(biome, "road_cobble" if town else "road_dirt")
+	ground_mat.set_shader_parameter("road_tex", G.tex("res://assets/tiles/%s.png" % rt))
+	ground_mat.set_shader_parameter("mask_origin", org)
+	ground_mat.set_shader_parameter("mask_size", Vector2(W, Hh) * MASK_K)
+	ground_mat.set_shader_parameter("has_roads", 1.0)
+
+## 在遮罩上盖一个柔边圆（中心 255，向外线性衰减）
+func _stamp(data:PackedByteArray, W:int, Hh:int, c:Vector2, r:float) -> void:
+	var R := r + 3.0
+	for yy in range(int(c.y - R), int(c.y + R) + 1):
+		if yy < 0 or yy >= Hh:
+			continue
+		for xx in range(int(c.x - R), int(c.x + R) + 1):
+			if xx < 0 or xx >= W:
+				continue
+			var d := Vector2(xx + 0.5, yy + 0.5).distance_to(c)
+			var v := int(clampf(1.0 - (d - r + 2.0) / 5.0, 0.0, 1.0) * 255.0)
+			var k := yy * W + xx
+			if v > data[k]:
+				data[k] = v
 
 # ---------------------------------------------------------------- 地形生成
 func _rng(salt:int) -> RandomNumberGenerator:
@@ -155,11 +224,7 @@ func _build_decor() -> void:
 				var o: String = objs[rng.randi() % objs.size()]
 				_add_obj(o, p3, o != "bush")
 			gx += 105
-	# 6) 道路图层 + 地点节点
-	var pl := PathLayer.new()
-	pl.ex = self
-	pl.z_index = -18
-	world.add_child(pl)
+	# 6) 地点节点（道路由地面着色器绘制）
 	for po in pois:
 		var n := PoiNode.new()
 		n.ex = self
@@ -497,27 +562,6 @@ func _offer_pick() -> void:
 	overlay(func(done): Flow.reward_screen(main, "boss" if n >= 6 else "any", done, 0, n))
 
 # ================================================================ 内部类
-class PathLayer extends Node2D:
-	var ex
-	func _draw() -> void:
-		var town: bool = ex.zdef["kind"] == "town"
-		var c1 := Color(0.42, 0.36, 0.28, 0.55) if not town else Color(0.55, 0.5, 0.44, 0.75)
-		var c2 := Color(0.55, 0.47, 0.36, 0.45) if not town else Color(0.66, 0.62, 0.55, 0.7)
-		match ex.biome:
-			"desert": c1 = Color(0.78, 0.62, 0.4, 0.5); c2 = Color(0.86, 0.72, 0.5, 0.45)
-			"yunlan": c1 = Color(0.72, 0.72, 0.75, 0.7); c2 = Color(0.84, 0.84, 0.86, 0.6)
-		for s in ex.paths:
-			draw_line(s[0], s[1], c1, 64.0 if town else 50.0)
-			draw_circle(s[0], 32.0 if town else 25.0, c1)
-			draw_circle(s[1], 32.0 if town else 25.0, c1)
-		for s in ex.paths:
-			draw_line(s[0], s[1], c2, 40.0 if town else 26.0)
-		if town:
-			# 主街
-			var y0: float = ex.arena.size.y * 0.47
-			draw_rect(Rect2(60, y0 - 50, ex.arena.size.x - 120, 150), c1)
-			draw_rect(Rect2(60, y0 - 34, ex.arena.size.x - 120, 118), c2)
-
 class PoiNode extends Node2D:
 	var ex
 	var poi: Dictionary
@@ -540,57 +584,29 @@ class PoiNode extends Node2D:
 			if not done and ty != "exit":
 				_marker(Vector2(0, -130 if poi["def"]["bld"] != "b_tower" else -205) + Vector2(0, bob), ty)
 			return
+		var top := -70.0
+		# 地点物件贴图（完成后变暗）
+		var tex_name: String = {"cave": "poi_cave", "shop": "poi_stall", "chest": "poi_chest_open" if done else "poi_chest", "story": "poi_tablet",
+			"rest": "poi_rest", "exit": "poi_exit", "boss": "poi_boss", "event": "poi_event", "duel": "poi_duel", "alchemy": "cauldron", "auction": "poi_stall"}.get(ty, "")
+		if tex_name != "":
+			var tx := G.tex("res://assets/obj/%s.png" % tex_name)
+			if tx:
+				var dim := done and not (ty in ["shop", "exit", "chest"])
+				var mc := Color(0.55, 0.55, 0.6) if dim else (Color(1.15, 1.1, 1.0) if near else Color.WHITE)
+				if not done and ty in ["story", "event", "rest"]:
+					var gc: Color = {"story": Color(1, 0.8, 0.3), "event": Color(0.4, 0.9, 1), "rest": Color(0.5, 0.75, 1)}[ty]
+					draw_circle(Vector2(0, -tx.get_height() * 0.45), tx.get_width() * 0.55 + sin(t * 2.5) * 3, Color(gc, 0.10))
+				draw_texture(tx, Vector2(-tx.get_width() / 2.0, -tx.get_height() + 6), mc)
+				top = -tx.get_height() - 10.0
+				if ty == "duel" and not done:
+					var sid: String = D.enemies[poi["def"]["boss"]].get("spr", "") if D.enemies.has(poi["def"]["boss"]) else ""
+					var st := G.spr(sid)
+					if st:
+						var sc := minf(1.0, 64.0 / st.get_height())
+						draw_texture_rect(st, Rect2(Vector2(-st.get_width() * sc / 2 + 10, -st.get_height() * sc - 20), st.get_size() * sc), false)
+				if ty == "boss" and not done:
+					draw_circle(Vector2(0, -50), 60 + sin(t * 2) * 4, Color(1, 0.2, 0.15, 0.06))
 		match ty:
-			"chest":
-				var c := Color(0.55, 0.33, 0.16) if not done else Color(0.3, 0.22, 0.15)
-				draw_rect(Rect2(-16, -22, 32, 22), c)
-				draw_rect(Rect2(-16, -22, 32, 22), Color(0.95, 0.75, 0.3), false, 2.0)
-				if not done:
-					draw_rect(Rect2(-17, -30, 34, 10), c.lightened(0.1))
-					draw_rect(Rect2(-17, -30, 34, 10), Color(0.95, 0.75, 0.3), false, 2.0)
-					draw_rect(Rect2(-3, -24, 6, 7), Color(1, 0.85, 0.3))
-					draw_circle(Vector2(0, -14), 26 + sin(t * 4) * 3, Color(1, 0.85, 0.3, 0.12))
-				else:
-					draw_rect(Rect2(-17, -40, 34, 6), c)
-			"cave":
-				draw_circle(Vector2(0, -10), 46, Color(0.18, 0.15, 0.12))
-				draw_circle(Vector2(0, -8), 36, Color(0.03, 0.02, 0.03))
-				for k in 7:
-					var a := PI + PI * k / 6.0
-					draw_circle(Vector2(cos(a) * 44, -8 + sin(a) * 40), 11, Color(0.35, 0.32, 0.28))
-				if not done:
-					draw_circle(Vector2(0, -10), 52 + sin(t * 2) * 3, Color(1, 0.6, 0.3, 0.1))
-			"exit", "boss":
-				var col := Color(1, 0.3, 0.25) if ty == "boss" else Color(0.5, 0.85, 1)
-				for k in 3:
-					draw_arc(Vector2(0, -30), 34 - k * 8 + sin(t * 3 + k) * 2, 0, TAU, 32, Color(col, 0.7 - k * 0.2), 3.0)
-				draw_circle(Vector2(0, -30), 18, Color(col, 0.25))
-			"story":
-				draw_circle(Vector2(0, -6), 30 + sin(t * 3) * 2, Color(1, 0.8, 0.3, 0.18 if not done else 0.04))
-				draw_rect(Rect2(-14, -20, 28, 18), Color(0.85, 0.75, 0.5) if not done else Color(0.4, 0.38, 0.33))
-				draw_line(Vector2(0, -20), Vector2(0, -2), Color(0.5, 0.35, 0.2), 2.0)
-			"rest":
-				draw_circle(Vector2(0, -6), 26, Color(0.3, 0.6, 0.9, 0.3 if not done else 0.08))
-				draw_arc(Vector2(0, -6), 20, 0, TAU, 24, Color(0.6, 0.85, 1, 0.8 if not done else 0.2), 2.0)
-			"alchemy":
-				var ct := G.tex("res://assets/obj/cauldron.png")
-				if ct:
-					draw_texture(ct, Vector2(-ct.get_width() / 2.0, -ct.get_height()), Color.WHITE if not done else Color(0.5, 0.5, 0.5))
-			"shop":
-				draw_rect(Rect2(-30, -34, 60, 30), Color(0.45, 0.28, 0.16))
-				draw_rect(Rect2(-36, -46, 72, 14), Color(0.75, 0.2, 0.18))
-				for k in 4:
-					draw_rect(Rect2(-36 + k * 18, -46, 9, 14), Color(0.95, 0.85, 0.7))
-				draw_circle(Vector2(-18, -38), 5, Color(1, 0.85, 0.3))
-			"event":
-				draw_circle(Vector2(0, -8), 14, Color(0.3, 0.5, 0.9, 0.5 if not done else 0.1))
-			"duel":
-				var sid: String = D.enemies[poi["def"]["boss"]].get("spr", "") if D.enemies.has(poi["def"]["boss"]) else ""
-				var st := G.spr(sid)
-				if st and not done:
-					var sc := minf(1.0, 70.0 / st.get_height())
-					draw_texture_rect(st, Rect2(Vector2(-st.get_width() * sc / 2, -st.get_height() * sc), st.get_size() * sc), false, Color(1, 0.9, 0.9))
-				draw_arc(Vector2(0, 0), 40, 0, TAU, 32, Color(1, 0.3, 0.3, 0.5 if not done else 0.1), 2.0)
 			"orb":
 				draw_circle(Vector2(0, -20 + bob), 16 + sin(t * 6) * 2, Color(1, 0.85, 0.4, 0.3))
 				draw_circle(Vector2(0, -20 + bob), 9, Color(1, 0.95, 0.7))
@@ -598,7 +614,7 @@ class PoiNode extends Node2D:
 		if ty != "orb":
 			_label(f, Vector2(0, 18), poi["n"], near)
 			if not done and ty in ["story", "event", "duel", "boss"]:
-				_marker(Vector2(0, -70 if ty != "duel" else -92) + Vector2(0, bob), ty)
+				_marker(Vector2(0, top - (30.0 if ty == "duel" else 0.0)) + Vector2(0, bob), ty)
 	func _marker(p:Vector2, ty:String) -> void:
 		var f: Font = G.font
 		var col := {"story": Color(1, 0.8, 0.3), "event": Color(0.5, 0.75, 1), "duel": Color(1, 0.35, 0.3), "boss": Color(1, 0.25, 0.2), "shop": Color(1, 0.85, 0.3), "auction": Color(1, 0.7, 0.4), "alchemy": Color(0.5, 1, 0.6), "rest": Color(0.6, 0.85, 1)}.get(ty, Color.WHITE)

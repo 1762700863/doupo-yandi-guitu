@@ -49,6 +49,7 @@ var amb_t := 0.0
 var combo_energy := 0.0
 var ult_banner_node: Control
 var H: BattleHUD
+var ground_mat: ShaderMaterial
 ## 待发放的机缘（数字=选项数量；升三星五选一，大境界突破六选一）。存于 run 中，跨场景保留
 var pending_picks: Array:
 	get:
@@ -117,33 +118,27 @@ func _build_floor() -> void:
 	var tiles: Texture2D = G.tex("res://assets/tiles/%s.png" % biome)
 	if tiles == null:
 		return
-	var src := tiles.get_image()
-	src.convert(Image.FORMAT_RGBA8)
 	var pad := 256
-	var W := int(arena.size.x) + pad * 2
-	var Hh := int(arena.size.y) + pad * 2
-	var img := Image.create(W, Hh, false, Image.FORMAT_RGBA8)
-	var rng := RandomNumberGenerator.new()
-	rng.seed = int(G.run.get("seed", 1)) + int(G.run.get("floor", 0)) * 13
-	var nvar := src.get_width() / 64
-	for y in range(0, Hh, 64):
-		for x in range(0, W, 64):
-			var v := rng.randi() % nvar
-			if biome == "lava" and v >= 2 and rng.randf() < 0.6:
-				v = rng.randi() % 2
-			var tile := src.get_region(Rect2i(v * 64, 0, 64, 64))
-			if biome != "yunlan" and biome != "hub":
-				if rng.randf() < 0.5:
-					tile.flip_x()
-				if rng.randf() < 0.5:
-					tile.flip_y()
-			img.blit_rect(tile, Rect2i(0, 0, 64, 64), Vector2i(x, y))
-	var spr := Sprite2D.new()
-	spr.texture = ImageTexture.create_from_image(img)
-	spr.centered = false
-	spr.position = arena.position - Vector2(pad, pad)
-	spr.z_index = -20
-	world.add_child(spr)
+	var sz := arena.size + Vector2(pad * 2, pad * 2)
+	var rect := ColorRect.new()
+	rect.size = sz
+	rect.position = arena.position - Vector2(pad, pad)
+	rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	rect.z_index = -20
+	var mat := ShaderMaterial.new()
+	mat.shader = load("res://shaders/ground.gdshader")
+	mat.set_shader_parameter("tiles", tiles)
+	mat.set_shader_parameter("origin", rect.position)
+	mat.set_shader_parameter("organic", 0.0 if biome in ["yunlan", "hub"] else 1.0)
+	mat.set_shader_parameter("seed", float(int(G.run.get("seed", 1)) % 997) * 0.013 + float(G.run.get("floor", 0)) * 0.37)
+	var tints := {"forest": [Color(1.0, 1.0, 0.95), Color(0.92, 1.02, 0.9)], "wutan": [Color(1.0, 1.0, 0.95), Color(1.04, 1.0, 0.86)],
+		"desert": [Color(1.0, 0.98, 0.94), Color(1.05, 0.96, 0.86)], "lava": [Color(1, 1, 1), Color(1.08, 0.94, 0.9)]}
+	var tt: Array = tints.get(biome, [Color.WHITE, Color.WHITE])
+	mat.set_shader_parameter("tint_a", tt[0])
+	mat.set_shader_parameter("tint_b", tt[1])
+	rect.material = mat
+	ground_mat = mat
+	world.add_child(rect)
 	var dark := OuterDark.new()
 	dark.rect = arena
 	dark.z_index = -19

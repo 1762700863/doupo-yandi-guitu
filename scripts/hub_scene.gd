@@ -89,10 +89,9 @@ func _process(d:float) -> void:
 func _draw() -> void:
 	var tiles := G.tex("res://assets/tiles/hub.png")
 	if tiles:
-		for y in range(0, 540, 64):
-			for x in range(0, 960, 64):
-				var v := int(abs(sin(x * 0.37 + y * 0.11)) * 7) % 4
-				draw_texture_rect_region(tiles, Rect2(x, y, 64, 64), Rect2(v * 64, 0, 64, 64))
+		for y in range(0, 540, 256):
+			for x in range(0, 960, 256):
+				draw_texture_rect_region(tiles, Rect2(x, y, 256, 256), Rect2(0, 0, 256, 256))
 	else:
 		draw_rect(Rect2(0, 0, 960, 540), Color(0.25, 0.22, 0.18))
 	# 中央石路
