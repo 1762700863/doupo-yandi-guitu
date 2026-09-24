@@ -49,6 +49,12 @@ var amb_t := 0.0
 var combo_energy := 0.0
 var ult_banner_node: Control
 var H: BattleHUD
+## 待发放的机缘（数字=选项数量；升三星五选一，大境界突破六选一）。存于 run 中，跨场景保留
+var pending_picks: Array:
+	get:
+		if not G.run.has("picks"):
+			G.run["picks"] = []
+		return G.run["picks"]
 
 func setup(m, c:Dictionary) -> void:
 	main = m
@@ -333,7 +339,7 @@ func enemy_died(e:Enemy) -> void:
 			H.hide_boss()
 			if player.no_hit_boss and not e.is_elite:
 				G.unlock_ach("ach_nohit")
-			if e.is_elite and int(G.run["realm"]) < 3:
+			if e.is_elite and D.realm_major(int(G.run["realm"])) < 1:
 				G.unlock_ach("ach_mqsnq")
 			if room_type == "bossrush":
 				get_tree().create_timer(2.0, false).timeout.connect(_next_rush_boss)
@@ -498,6 +504,8 @@ func nearest_enemy(pos:Vector2, rng:float, exclude=null):
 	var bd := rng
 	for e in enemies:
 		if e == exclude or e.dead or e.spawn_t > 0.3:
+			continue
+		if e.dormant and e.global_position.distance_to(pos) > 240:
 			continue
 		var d: float = e.global_position.distance_to(pos)
 		if d < bd:
@@ -952,7 +960,7 @@ func boss_phase(e:Enemy, ph:int, line:String) -> void:
 
 # ---------------------------------------------------------------- 更新
 func _update_pickups(delta:float) -> void:
-	var mag: float = player.st["magnet"] + (2000.0 if cleared else 0.0)
+	var mag: float = player.st["magnet"] + (2000.0 if cleared and room_type != "explore" else 0.0)
 	for i in range(pickups.size() - 1, -1, -1):
 		var pk: Dictionary = pickups[i]
 		pk["t"] += delta
@@ -1005,9 +1013,9 @@ func gain_exp(v:float) -> void:
 		need = G.exp_needed(int(G.run["realm"]))
 
 func _realm_up() -> void:
-	var old_major: int = int(G.run["realm"]) / 3
+	var old_major: int = D.realm_major(int(G.run["realm"]))
 	G.run["realm"] = int(G.run["realm"]) + 1
-	var new_major: int = int(G.run["realm"]) / 3
+	var new_major: int = D.realm_major(int(G.run["realm"]))
 	var old_slots = player.st["hp_max"]
 	player.recalc()
 	player.hp = min(player.st["hp_max"], player.hp + player.st["hp_max"] * 0.25)
@@ -1015,6 +1023,7 @@ func _realm_up() -> void:
 	spawn_fx("ring", player.global_position, {"r": 120, "col": col, "life": 0.6, "width": 8})
 	burst_particles(player.global_position + Vector2(0, -20), col, 30, 260, 3)
 	if new_major > old_major:
+		pending_picks.append(6)
 		H.breakthrough(D.realm_name(int(G.run["realm"])), col)
 		Au.sfx("breakthrough", -2)
 		aoe_damage(player.global_position, 200, {"dmg": 30 * player.dmg_mult("phys"), "elem": "phys", "knock": 400})
@@ -1022,6 +1031,8 @@ func _realm_up() -> void:
 		if new_major >= 5 and not G.run["flags"].get("trib_done", false):
 			G.run["flags"]["trib_pending"] = true
 	else:
+		if (int(G.run["realm"]) % 9) % 3 == 0:
+			pending_picks.append(5)
 		float_text(player.global_position + Vector2(0, -80), D.realm_name(int(G.run["realm"])), col, true)
 		Au.sfx("levelup", -6)
 

@@ -93,6 +93,8 @@ static func _pool_for(cat:String) -> Array:
 	var out := []
 	var lib: int = int(G.meta["buildings"].get("library", 1))
 	for id in base:
+		if WD.canon.has(id):
+			continue   # 萧炎的原著斗技只能通过剧情获得
 		var s: Dictionary = D.skills[id]
 		if s["tier"] >= 2 and not (id in G.meta["unlocked_skills"]) and s["tier"] > lib / 2 + 1:
 			continue

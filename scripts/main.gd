@@ -128,16 +128,7 @@ func _clicktest(args:Dictionary) -> void:
 		await get_tree().create_timer(1.5).timeout
 		print("CT after ch dialog scene=", _scene_name())
 		await _ct_shot(args, "04_map")
-		if current is MapScene:
-			var pos: Vector2
-			if G.run["map"]["type"] == "branch":
-				pos = current.nodes_pos["0_0"]
-			else:
-				pos = current.nodes_pos["door_0"].get_center()
-			await _click_at(pos)
-			await get_tree().create_timer(1.5).timeout
-			print("CT after map click scene=", _scene_name())
-			await _ct_shot(args, "05_room")
+		print("CT explore=", current is Explore)
 	else:
 		await _click("新游戏")
 		await get_tree().create_timer(0.5).timeout
@@ -245,47 +236,17 @@ func _autotest() -> void:
 			Flow.show_map(self)
 			await get_tree().create_timer(0.5).timeout
 			Flow.chapter_clear(self)
-		"clickmap":
+		"explore":
 			G.new_run(c, int(args.get("ch", "1")), D.chars[c]["atks"][0], "yaolao", 1, [])
-			Flow.show_map(self)
-			await get_tree().create_timer(1.0).timeout
-			var sc2 = current
-			var pos: Vector2
-			if G.run["map"]["type"] == "branch":
-				pos = sc2.nodes_pos["0_0"]
-			else:
-				pos = sc2.nodes_pos["door_0"].get_center()
-			var win_pos := pos * (Vector2(get_window().size) / Vector2(960, 540))
-			for pr in [true, false]:
-				var ev := InputEventMouseButton.new()
-				ev.button_index = MOUSE_BUTTON_LEFT
-				ev.pressed = pr
-				ev.position = win_pos
-				ev.global_position = win_pos
-				Input.parse_input_event(ev)
-				await get_tree().process_frame
-			await get_tree().create_timer(1.5).timeout
-			print("AFTER_CLICK scene=", current.get_class(), " ", current is Battle)
-		"flow":
-			G.new_run(c, int(args.get("ch", "1")), D.chars[c]["atks"][0], "yaolao", 1, [])
-			Flow.show_map(self)
-			await get_tree().create_timer(0.5).timeout
-			var node := {"t": args.get("node", "fight")}
-			if args.has("boss"):
-				node["boss"] = args["boss"]
-			Flow.node_selected(self, node)
-			for i in 40:
-				await get_tree().create_timer(0.4).timeout
-				var b := battle()
-				if b:
-					b.player.hp = b.player.st["hp_max"]
-					for e in b.enemies.duplicate():
-						if is_instance_valid(e):
-							e.hp = 0.0
-							e.die()
-		"map1", "map2":
-			G.new_run(c, 1 if sc == "map1" else 2, D.chars[c]["atks"][0], "yaolao", 1, [])
-			Flow.show_map(self)
+			G.run["zone"] = Flow.new_zone_state(int(args.get("ch", "1")), int(args.get("zi", "0")))
+			Flow.enter_zone(self)
+			if args.has("tp"):
+				await get_tree().create_timer(1.0).timeout
+				var ex = current
+				for po in ex.pois:
+					if po["t"] == args["tp"]:
+						ex.player.global_position = po["p"] + Vector2(0, 40)
+						break
 		"battle", "boss", "elite":
 			G.new_run(c, int(args.get("ch", "1")), D.chars[c]["atks"][0], args.get("comp", "yaolao"), 1, [])
 			G.run["realm"] = int(args.get("realm", "3"))
@@ -415,7 +376,41 @@ func fade_to(cb:Callable) -> void:
 		cb.call()
 		_fade_out())
 
+## 操作模式：鼠标模式下不显示“默认选中”的高亮；按方向键/手柄时才启用焦点导航
+var kb_mode := false
+var pref_focus: WeakRef = null
+
+func _input(e:InputEvent) -> void:
+	if e is InputEventMouseMotion and e.relative.length() > 1.5 or e is InputEventMouseButton:
+		kb_mode = false
+	elif (e is InputEventKey or e is InputEventJoypadButton) and e.is_pressed() or e is InputEventJoypadMotion and absf(e.axis_value) > 0.6:
+		var nav := e.is_action("ui_up") or e.is_action("ui_down") or e.is_action("ui_left") or e.is_action("ui_right") or e.is_action("ui_accept") or e.is_action("ui_focus_next")
+		if nav and not kb_mode:
+			kb_mode = true
+			if get_viewport().gui_get_focus_owner() == null:
+				var target: Control = null
+				if pref_focus and pref_focus.get_ref() and pref_focus.get_ref().is_visible_in_tree():
+					target = pref_focus.get_ref()
+				else:
+					var btns := []
+					var kids := ui_layer.get_children()
+					kids.reverse()
+					for k in kids:
+						_collect_btns(k, btns)
+						if btns.size() > 0:
+							break
+					if btns.size() > 0:
+						target = btns[0]
+				if target:
+					target.grab_focus()
+					get_viewport().set_input_as_handled()
+
 func _process(d:float) -> void:
+	if not kb_mode:
+		var fo := get_viewport().gui_get_focus_owner()
+		if fo is BaseButton:
+			pref_focus = weakref(fo)
+			fo.release_focus()
 	if battle() == null and Engine.time_scale != 1.0:
 		Engine.time_scale = 1.0
 	# 保险：黑幕停留超过1.2秒自动揭开

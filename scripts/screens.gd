@@ -33,10 +33,14 @@ static func confirm(m, title:String, body:String, yes:String, no:String, cb:Call
 # ---------------------------------------------------------------- 奖励三选一
 static func choose_reward(m, opts:Array, title:String, done:Callable) -> void:
 	var root := _bg(m, 0.75)
-	UI.label(root, title, Vector2(0, 40), 24, UI.theme_cols()["accent"], 960, HORIZONTAL_ALIGNMENT_CENTER)
+	UI.label(root, title + ("  ·  %s选一" % ["", "一", "二", "三", "四", "五", "六"][clampi(opts.size(), 0, 6)] if opts.size() > 1 else ""), Vector2(0, 40), 24, UI.theme_cols()["accent"], 960, HORIZONTAL_ALIGNMENT_CENTER)
 	UI.label(root, "斗技槽 %d/%d  ·  大招槽 %d  ·  %s" % [G.run["arts"].size(), G.art_slots(), G.ult_slots(), D.realm_name(int(G.run["realm"]))], Vector2(0, 72), 12, Color(0.8, 0.8, 0.8), 960, HORIZONTAL_ALIGNMENT_CENTER)
 	var w := 240.0
 	var gap := 20.0
+	match opts.size():
+		4: w = 204.0; gap = 16.0
+		5: w = 172.0; gap = 12.0
+		6: w = 147.0; gap = 8.0
 	var x0 := 480 - (opts.size() * w + (opts.size() - 1) * gap) * 0.5
 	var first: Button = null
 	for i in opts.size():

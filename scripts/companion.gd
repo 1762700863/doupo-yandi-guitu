@@ -83,7 +83,7 @@ func _physics_process(delta:float) -> void:
 func _attack(enemy) -> void:
 	var rate: float = data["rate"]
 	cd = rate
-	var dmg: float = data["atk"] * (1.0 + int(G.run["realm"]) * 0.09) * (1.0 + b.player.st["comp_dmg"]) * (1.0 + G.meta["bond"].get(cid, 0) * 0.06)
+	var dmg: float = data["atk"] * (1.0 + G.rpow() * 0.09) * (1.0 + b.player.st["comp_dmg"]) * (1.0 + G.meta["bond"].get(cid, 0) * 0.06)
 	var dir: Vector2 = (enemy.global_position - global_position).normalized()
 	var col := D.elem_color(data["elem"])
 	var info := {"speed": 360, "r": 6, "dmg": dmg, "elem": data["elem"], "pierce": 0, "life": 1.3, "homing": 3.0}
@@ -93,7 +93,7 @@ func _attack(enemy) -> void:
 		"poison":
 			info["poison"] = 1
 			if cid == "xiaoyixian" and b.player.hp < b.player.st["hp_max"]:
-				b.player.heal(1.5 + int(G.run["realm"]) * 0.2, false)
+				b.player.heal(1.5 + G.rpow() * 0.2, false)
 		"wind":
 			info["pierce"] = 2
 			info["crescent"] = true

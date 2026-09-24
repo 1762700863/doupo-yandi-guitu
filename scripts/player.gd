@@ -87,7 +87,7 @@ func setup(battle, char_id:String) -> void:
 # ---------------------------------------------------------------- 属性
 func recalc() -> void:
 	var r: Dictionary = G.run
-	var realm: int = int(r["realm"])
+	var realm: float = G.rpow()
 	var s := {
 		"hp_max": float(cdata["hp"]) + realm * 11.0 + float(r.get("max_hp_bonus", 0)),
 		"dmg": 1.0 + realm * 0.095, "crit": 0.05, "crit_dmg": 0.6, "cdr": 0.0, "spd": float(cdata["spd"]),

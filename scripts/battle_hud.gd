@@ -120,7 +120,7 @@ class HudDraw extends Control:
 		_txt(Vector2(72, 25), "%d / %d" % [int(p.hp), int(p.st["hp_max"])], 12, Color.WHITE)
 		var realm: int = int(G.run["realm"])
 		var need := G.exp_needed(realm)
-		var rc: Color = D.REALM_COLORS[clampi(realm / 3, 0, 11)]
+		var rc: Color = D.REALM_COLORS[D.realm_major(realm)]
 		_bar(Rect2(68, 30, 200, 6), float(G.run["exp"]) / need, rc)
 		_txt(Vector2(68, 50), D.realm_name(realm) + ("（已达本章上限）" if realm >= G.realm_cap() else ""), 12, rc)
 		# 金币/药材
@@ -202,11 +202,14 @@ class HudDraw extends Control:
 		var ch: Dictionary = D.chapters[int(G.run["chapter"])]
 		_txt(Vector2(950, 22), "%s · %s" % [ch["n"], ch["t"]], 12, th["accent"], HORIZONTAL_ALIGNMENT_RIGHT, -1)
 		var tt := int(G.run["time"])
-		_txt(Vector2(950, 38), "层 %d   %02d:%02d   击杀 %d" % [int(G.run["floor"]) + 1, tt / 60, tt % 60, int(G.run["kills"])], 8, Color(0.85, 0.85, 0.85), HORIZONTAL_ALIGNMENT_RIGHT, -1)
+		if b.room_type == "explore":
+			_txt(Vector2(950, 40), "%02d:%02d   击杀 %d" % [tt / 60, tt % 60, int(G.run["kills"])], 11, Color(0.85, 0.85, 0.85), HORIZONTAL_ALIGNMENT_RIGHT, -1)
+		else:
+			_txt(Vector2(950, 40), "%02d:%02d   击杀 %d" % [tt / 60, tt % 60, int(G.run["kills"])], 11, Color(0.85, 0.85, 0.85), HORIZONTAL_ALIGNMENT_RIGHT, -1)
 		if b.room_type == "fight":
-			_txt(Vector2(950, 52), "剩余 %d 波 · 敌人 %d" % [max(0, b.waves_left), b.enemies.size()], 8, Color(0.85, 0.85, 0.85), HORIZONTAL_ALIGNMENT_RIGHT, -1)
+			_txt(Vector2(950, 56), "剩余 %d 波 · 敌人 %d" % [max(0, b.waves_left), b.enemies.size()], 11, Color(0.85, 0.85, 0.85), HORIZONTAL_ALIGNMENT_RIGHT, -1)
 		if G.run["tianjie"].size() > 0:
-			_txt(Vector2(950, 66), "天劫 %d" % G.run["tianjie"].size(), 8, Color(1, 0.4, 0.4), HORIZONTAL_ALIGNMENT_RIGHT, -1)
+			_txt(Vector2(950, 70 if b.room_type != "explore" else 204), "天劫 %d" % G.run["tianjie"].size(), 11, Color(1, 0.4, 0.4), HORIZONTAL_ALIGNMENT_RIGHT, -1)
 		# ---- Boss 血条 ----
 		if h.boss and is_instance_valid(h.boss) and not h.boss.dead:
 			var e: Enemy = h.boss

@@ -45,6 +45,7 @@ func _build_ui() -> void:
 			Au.sfx("hover", -14))
 		b.mouse_exited.connect(func(): if hover == bid: hover = "")
 		b.focus_entered.connect(func(): hover = bid)
+		b.focus_exited.connect(func(): if hover == bid: hover = "")
 		b.pressed.connect(func(): _open(bid))
 		root.add_child(b)
 		if id == "gate":
@@ -523,7 +524,7 @@ func _challenge_panel() -> void:
 		if yes:
 			var c: String = G.meta.get("last_char", "xiaoyan")
 			G.new_run(c, 2, D.chars[c]["atks"][0], "", int(G.meta.get("diff", 1)), [], "bossrush")
-			G.run["realm"] = 8
+			G.run["realm"] = 27
 			Flow.start_bossrush(m))
 
 # ---------------------------------------------------------------- 出征

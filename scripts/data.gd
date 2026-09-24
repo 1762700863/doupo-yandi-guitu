@@ -21,7 +21,10 @@ const ELEM := {
 # 境界（每章限制上限）。每个境界分 初/中/后 三个小阶段
 const REALMS := ["斗之气","斗者","斗师","大斗师","斗灵","斗王","斗皇","斗宗","斗尊","半圣","斗圣","斗帝"]
 const REALM_COLORS := [Color(0.7,0.7,0.7),Color(0.6,0.9,0.6),Color(0.4,0.8,1),Color(0.3,0.5,1),Color(0.7,0.5,1),Color(1,0.75,0.3),Color(1,0.5,0.2),Color(1,0.3,0.3),Color(1,0.25,0.6),Color(0.9,0.9,1),Color(1,0.95,0.6),Color(1,1,1)]
-const SUB_STAGES := ["初期","中期","后期"]
+const SUB_STAGES := ["一","二","三","四","五","六","七","八","九"]
+# 境界编号 r：大境界 = r / 9，小阶 = r % 9（斗之气为“段”，其余为“星”）；斗帝 = 99
+# 战力换算表（每个大境界起点的战力值），用于属性成长
+const REALM_POW := [0.0, 6.0, 11.0, 14.0, 17.0, 20.0, 23.0, 26.0, 28.0, 30.0, 31.0, 33.0, 33.0]
 
 # 天劫（加难词条）
 const TIANJIE := [
@@ -433,13 +436,13 @@ var bosses := {
 # ------------------------------------------------------------------ 章节
 # map: branch = 分支地图, doors = 房间门选择, linear = 线性
 var chapters := [
-	{"id":0,"n":"序章","t":"炎帝归来","biome":"void","map":"linear","cap":11,"start_realm":10,"music":"prologue",
+	{"id":0,"n":"序章","t":"炎帝归来","biome":"void","map":"linear","cap":99,"start_realm":99,"music":"prologue",
 		"ui":{"bg":Color(0.08,0.05,0.12,0.94),"border":Color(0.75,0.55,1),"accent":Color(1,0.8,0.4)},"tint":Color(0.75,0.7,0.95)},
-	{"id":1,"n":"第一章","t":"乌坦城·魔兽山脉","biome":"forest","biome2":"wutan","map":"branch","cap":3,"start_realm":0,"floors":11,"music":"battle1",
+	{"id":1,"n":"第一章","t":"乌坦城·魔兽山脉","biome":"forest","biome2":"wutan","map":"branch","cap":17,"start_realm":0,"floors":11,"music":"battle1",
 		"pool":[["wolf_grey","wolf"],["wolf","wolf_purple","wolf_grey"],["wolf_purple","wolf_red","bandit"],["bandit","wolf_red","wolf_purple","wisp"]],
 		"elites":["jialie","mulie"],"boss":"mushe","boss2":"wolfking",
 		"ui":{"bg":Color(0.1,0.13,0.08,0.94),"border":Color(0.72,0.6,0.36),"accent":Color(0.6,1,0.5)},"tint":Color(1,0.98,0.92)},
-	{"id":2,"n":"第二章","t":"塔戈尔沙漠·云岚宗","biome":"desert","biome2":"yunlan","map":"doors","cap":5,"start_realm":3,"floors":12,"music":"battle2",
+	{"id":2,"n":"第二章","t":"塔戈尔沙漠·云岚宗","biome":"desert","biome2":"yunlan","map":"doors","cap":35,"start_realm":18,"floors":12,"music":"battle2",
 		"pool":[["snake","sand_wisp","wisp"],["snake","snake_mage","sand_wisp"],["disciple","snake_mage","wisp_green"],["disciple","soul","disciple","wisp_green"]],
 		"elites":["nalan","soul_elder"],"boss":"yunshan","mid":"medusa","fire_boss":"fire_spirit",
 		"ui":{"bg":Color(0.16,0.12,0.07,0.94),"border":Color(0.95,0.75,0.35),"accent":Color(1,0.85,0.4)},"tint":Color(1,0.96,0.88)},
@@ -547,6 +550,7 @@ var events := [
 var story := {}
 func _build_story() -> void:
 	# 每条: [说话人id(用于头像，""为旁白), 名字, 文本]
+	story.merge(WD.stories())
 	story["prologue_start"] = [
 		["","","中州，天墓之巅。万族陨落，苍穹破碎。"],
 		["hun_tiandi","魂天帝","萧炎，这斗气大陆，只能有一个帝！"],
@@ -632,8 +636,21 @@ func elem_color(e:String) -> Color:
 	return ELEM.get(e, ELEM["phys"])["c"]
 
 func realm_name(r:int) -> String:
-	var major := clampi(r / 3, 0, REALMS.size()-1)
-	return REALMS[major] + SUB_STAGES[r % 3]
+	var major := clampi(r / 9, 0, REALMS.size()-1)
+	if major == REALMS.size() - 1:
+		return "斗帝"
+	if major == 0:
+		return "斗之气·%s段" % SUB_STAGES[r % 9]
+	return "%s·%s星" % [REALMS[major], SUB_STAGES[r % 9]]
+
+func realm_major(r:int) -> int:
+	return clampi(r / 9, 0, REALMS.size()-1)
+
+## 战力（属性成长用），在大境界之间线性插值
+func realm_pow(r:int) -> float:
+	var major := clampi(r / 9, 0, REALMS.size()-1)
+	var sub := float(r % 9) / 9.0 if major < REALMS.size() - 1 else 0.0
+	return lerpf(REALM_POW[major], REALM_POW[major + 1], sub)
 
 func fire_pair_key(a:String, b:String) -> String:
 	var arr := [a, b]

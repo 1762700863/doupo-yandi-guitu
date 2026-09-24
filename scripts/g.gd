@@ -61,13 +61,13 @@ const ACTIONS := {
 	"up": ["W", "上移"], "down": ["S", "下移"], "left": ["A", "左移"], "right": ["D", "右移"],
 	"dodge": ["Space", "身法/闪避"], "art1": ["Q", "斗技1"], "art2": ["E", "斗技2"], "art3": ["R", "斗技3"],
 	"art4": ["F", "斗技4"], "ult": ["C", "大招"], "ult2": ["X", "第二大招"], "special": ["V", "角色特殊"],
-	"pill": ["G", "使用丹药"], "combo": ["T", "同伴合击"], "interact": ["Z", "互动"], "panel": ["Tab", "功法面板"],
+	"pill": ["G", "使用丹药"], "combo": ["T", "同伴合击"], "interact": ["Z", "互动"], "panel": ["Tab", "功法面板"], "bigmap": ["M", "地图"],
 	"cmd1": ["1", "同伴：跟随"], "cmd2": ["2", "同伴：进攻"], "cmd3": ["3", "同伴：守护"], "cmd4": ["4", "同伴：集火"],
 }
 const PAD := {
 	"dodge": JOY_BUTTON_A, "art1": JOY_BUTTON_X, "art2": JOY_BUTTON_Y, "art3": JOY_BUTTON_B,
 	"art4": JOY_BUTTON_LEFT_SHOULDER, "ult": JOY_BUTTON_RIGHT_SHOULDER, "special": JOY_BUTTON_LEFT_STICK,
-	"pill": JOY_BUTTON_DPAD_DOWN, "combo": JOY_BUTTON_DPAD_UP, "interact": JOY_BUTTON_A, "panel": JOY_BUTTON_BACK,
+	"pill": JOY_BUTTON_DPAD_DOWN, "combo": JOY_BUTTON_DPAD_UP, "interact": JOY_BUTTON_A, "panel": JOY_BUTTON_BACK, "bigmap": JOY_BUTTON_RIGHT_STICK,
 	"ult2": JOY_BUTTON_RIGHT_STICK, "cmd1": JOY_BUTTON_DPAD_LEFT, "cmd2": JOY_BUTTON_DPAD_RIGHT,
 }
 
@@ -260,7 +260,7 @@ func new_run(char_id:String, chapter:int, atk:String, comp:String, diff:int, tia
 	run = {
 		"char": char_id, "chapter": chapter, "mode": mode,
 		"diff": diff, "tianjie": tianjie, "seed": randi(),
-		"realm": int(ch.get("start_realm", 0)) * 3, "exp": 0.0,
+		"realm": int(ch.get("start_realm", 0)), "exp": 0.0,
 		"hp": -1, "max_hp_bonus": 0,
 		"gold": 60 + int(tf.get("start_gold", 0)),
 		"herbs": {}, "pills": [], "pill_cap": 3,
@@ -278,7 +278,9 @@ func new_run(char_id:String, chapter:int, atk:String, comp:String, diff:int, tia
 		add_skill(a)
 	run["ults"].append(c["ult"])
 	run["skill_grades"][c["ult"]] = D.skills[c["ult"]]["tier"] * 3
-	if char_id == "xiaoyan" and chapter >= 2:
+	if char_id == "xiaoyan" and chapter >= 1:
+		_canon_kit(chapter)
+	if char_id == "xiaoyan" and chapter >= 3:
 		add_fire("qldx", false)
 	if chapter == 0:
 		_setup_prologue()
@@ -293,7 +295,7 @@ func new_run(char_id:String, chapter:int, atk:String, comp:String, diff:int, tia
 		save_meta()
 
 func _setup_prologue() -> void:
-	run["realm"] = 32
+	run["realm"] = 99
 	run["atk"] = "atk_flame"
 	run["atk_grade"] = 9
 	for a in ["art_starfall", "art_yanfen", "art_dragonroar", "art_fireRain"]:
@@ -305,6 +307,40 @@ func _setup_prologue() -> void:
 	for f in ["qldx", "ylxy", "glly", "hxy", "sqyy", "jlyh", "xwty"]:
 		add_fire(f, false)
 	run["relics"] = ["rl_mohe7", "rl_tianyan", "rl_lingxi", "rl_xuemai"]
+
+## 萧炎的原著斗技：本章及以后才学会的，从初始配置里移除；之前章节学会的，直接获得
+func _canon_kit(chapter:int) -> void:
+	for cid in WD.canon:
+		var cd: Dictionary = WD.canon[cid]
+		if int(cd["ch"]) >= chapter:
+			run["arts"].erase(cid)
+			run["ults"].erase(cid)
+		else:
+			learn_canon(cid)
+
+func learn_canon(cid:String) -> void:
+	if has_skill(cid):
+		return
+	var cd: Dictionary = WD.canon[cid]
+	var s: Dictionary = D.skills[cid]
+	var gr: int = int(cd.get("grade", s["tier"] * 3))
+	match s["cat"] if s.has("cat") else "art":
+		"ult":
+			if run["ults"].size() >= ult_slots() and run["ults"].size() > 0:
+				var drop: String = run["ults"][0]
+				for u in run["ults"]:
+					if not WD.canon.has(u):
+						drop = u
+				run["ults"].erase(drop)
+			run["ults"].append(cid)
+			run["skill_grades"][cid] = gr
+		"move":
+			run["move"] = cid
+		_:
+			add_skill(cid, gr)
+
+func has_skill(id:String) -> bool:
+	return id in run.get("arts", []) or id in run.get("ults", []) or run.get("move", "") == id or run.get("atk", "") == id or run.get("gong", "") == id or id in run.get("relics", [])
 
 func add_skill(id:String, grade:int=-1) -> void:
 	var s: Dictionary = D.skills[id]
@@ -342,7 +378,7 @@ func add_fire(id:String, notify:bool=true) -> void:
 
 func art_slots() -> int:
 	# 随境界增加：斗之气2 → 斗者3 → 斗师3 → 大斗师4 → 斗王以上5 +法宝
-	var major: int = int(run["realm"]) / 3
+	var major: int = D.realm_major(int(run["realm"]))
 	var n := 2
 	if major >= 1: n = 3
 	if major >= 3: n = 4
@@ -353,27 +389,37 @@ func art_slots() -> int:
 	return n
 
 func ult_slots() -> int:
-	var major: int = int(run["realm"]) / 3
+	var major: int = D.realm_major(int(run["realm"]))
 	return 2 if major >= 2 else 1
 
 func fire_slots() -> int:
-	var major: int = int(run["realm"]) / 3
+	var major: int = D.realm_major(int(run["realm"]))
 	var n := 1 + major / 2
 	for r in run["relics"]:
 		n += int(D.skills[r]["p"].get("fire_slot", 0))
 	return max(1, n)
 
+## 升一段/一星所需斗气：按战力差折算，大境界突破前一星略多
 func exp_needed(realm:int) -> float:
-	return 20.0 + realm * 14.0 + pow(realm, 1.6) * 3.0
+	var p := D.realm_pow(realm)
+	var dp: float = max(0.35, D.realm_pow(realm + 1) - p)
+	var base := (20.0 + p * 14.0 + pow(p, 1.6) * 3.0) * dp
+	if realm % 9 == 8:
+		base *= 1.5
+	return max(8.0, base)
+
+## 当前战力（属性成长）
+func rpow() -> float:
+	return D.realm_pow(int(run.get("realm", 0)))
 
 func realm_cap() -> int:
 	var ch: Dictionary = D.chapters[int(run["chapter"])]
-	return int(ch["cap"]) * 3 + 2
+	return int(ch["cap"])
 
 ## 局外（地图界面）估算生命上限 / 回复
 func est_hp_max() -> float:
 	var c: Dictionary = D.chars[run["char"]]
-	return max(20.0, float(c["hp"]) + int(run["realm"]) * 11.0 + float(run.get("max_hp_bonus", 0)))
+	return max(20.0, float(c["hp"]) + rpow() * 11.0 + float(run.get("max_hp_bonus", 0)))
 
 func heal_run(pct:float) -> void:
 	if float(run["hp"]) < 0:

@@ -50,6 +50,9 @@ var cast_t := 0.0
 var cast_data := {}
 var enraged := false
 var summon_wave := 0
+var dormant := false     # 探索地图：休眠中（玩家靠近或受击才苏醒）
+var pack := ""           # 所属怪物群
+var home := Vector2.ZERO
 
 func setup(battle, eid:String, boss:bool, mult:float) -> void:
 	b = battle
@@ -111,6 +114,15 @@ func _physics_process(delta:float) -> void:
 	if p == null or p.dead:
 		_anim(delta)
 		return
+	if dormant:
+		# 原地徘徊；玩家靠近则整群苏醒
+		if p.global_position.distance_to(global_position) < (330.0 if is_boss else 270.0):
+			b.wake_pack(pack)
+		else:
+			walk += delta * 0.4
+			global_position = global_position.lerp(home + Vector2(sin(t * 0.7 + home.x) * 18, cos(t * 0.5 + home.y) * 12), delta * 0.8)
+			_anim(delta)
+			return
 	var frozen := freeze > 0 or stun > 0 or petrify > 0
 	var slow := 1.0
 	if chill > 0:
@@ -146,7 +158,7 @@ func _status(delta:float) -> void:
 		if poison > 0:
 			poison_t -= 0.5
 			var pm: float = 1.0 + (float(b.player.st.get("poison_dmg", 0.0)) if b.player else 0.0)
-			_raw_damage(poison * 1.6 * pm * (1.0 + int(G.run.get("realm", 0)) * 0.06), D.elem_color("poison"), false)
+			_raw_damage(poison * 1.6 * pm * (1.0 + G.rpow() * 0.06), D.elem_color("poison"), false)
 			if poison_t <= 0:
 				poison = max(0, poison - 1)
 				poison_t = 3.0
@@ -167,6 +179,8 @@ func _raw_damage(v:float, col:Color, big:bool) -> void:
 func hurt(info:Dictionary, from:Vector2) -> float:
 	if dead or spawn_t > 0.2:
 		return 0.0
+	if dormant and b.has_method("wake_pack"):
+		b.wake_pack(pack)
 	var p = b.player
 	var v: float = info.get("dmg", 5.0)
 	var crit := false
@@ -199,7 +213,7 @@ func hurt(info:Dictionary, from:Vector2) -> float:
 	if info.has("burn") or p.st["burn"] > 0:
 		var stacks: float = float(info.get("burn", 0)) + p.st["burn"]
 		if stacks > 0:
-			apply_burn(3.0 * stacks * (1.0 + p.st["burn_dmg"]) * (1 + int(G.run["realm"]) * 0.05), 3.0)
+			apply_burn(3.0 * stacks * (1.0 + p.st["burn_dmg"]) * (1 + G.rpow() * 0.05), 3.0)
 	var pz: int = int(info.get("poison", 0)) + int(p.st["poison_hit"])
 	if pz > 0:
 		poison = min(poison + pz, 30)

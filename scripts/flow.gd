@@ -1,122 +1,13 @@
 class_name Flow
 extends RefCounted
-## 局流程：地图生成、节点进入、奖励、坊市、拍卖、奇遇、修炼、吞火、渡劫、章节推进、结算
+## 局流程：章节开始、探索地图（区域/洞穴/对决/首领）、奖励、吞火、渡劫、章节推进、结算
 
-const NODE_INFO := {
-	"fight": {"n": "战斗", "c": Color(0.9, 0.85, 0.75), "icon": "剑"},
-	"elite": {"n": "精英", "c": Color(1, 0.45, 0.3), "icon": "煞"},
-	"boss": {"n": "首领", "c": Color(1, 0.2, 0.2), "icon": "王"},
-	"midboss": {"n": "强敌", "c": Color(1, 0.3, 0.5), "icon": "凶"},
-	"shop": {"n": "坊市", "c": Color(1, 0.85, 0.3), "icon": "市"},
-	"event": {"n": "奇遇", "c": Color(0.6, 0.8, 1), "icon": "？"},
-	"alchemy": {"n": "炼药房", "c": Color(0.5, 1, 0.6), "icon": "丹"},
-	"rest": {"n": "修炼", "c": Color(0.7, 0.9, 1), "icon": "修"},
-	"auction": {"n": "拍卖会", "c": Color(1, 0.7, 0.9), "icon": "拍"},
-	"fire": {"n": "异火", "c": Color(1, 0.55, 0.2), "icon": "火"},
-	"firebeast": {"n": "异火守护", "c": Color(0.2, 1, 0.7), "icon": "莲"},
-	"story": {"n": "剧情", "c": Color(1, 1, 1), "icon": "卷"},
-}
-const DOOR_REWARDS := {
-	"art": {"n": "斗技", "c": Color(1, 0.6, 0.3)}, "relic": {"n": "法宝", "c": Color(0.8, 0.7, 1)},
-	"upgrade": {"n": "升阶", "c": Color(0.5, 0.9, 1)}, "gold": {"n": "金币", "c": Color(1, 0.85, 0.3)},
-	"herb": {"n": "药材", "c": Color(0.5, 1, 0.5)}, "ult": {"n": "大招", "c": Color(1, 0.3, 0.3)},
-	"move": {"n": "身法", "c": Color(0.7, 1, 0.9)}, "gong": {"n": "功法", "c": Color(1, 0.9, 0.6)},
-}
-
-# ---------------------------------------------------------------- 地图生成
-static func gen_map() -> void:
-	var r: Dictionary = G.run
-	var ch: Dictionary = D.chapters[int(r["chapter"])]
-	var rng := RandomNumberGenerator.new()
-	rng.seed = int(r["seed"]) + int(r["chapter"]) * 1000
-	var floors: int = int(ch.get("floors", 10))
-	var m := {"type": ch["map"], "floors": [], "pos": [-1, -1]}
-	if ch["map"] == "branch":
-		for f in floors:
-			var row := []
-			var n := rng.randi_range(2, 4)
-			if f == 0 or f == floors - 1 or f == 5:
-				n = 1
-			for i in n:
-				var t := _roll_type(rng, f, floors)
-				if f == 0: t = "fight"
-				if f == 5: t = "midboss"
-				if f == floors - 1: t = "boss"
-				if f == floors - 2: t = "rest" if i == 0 else ("shop" if i == 1 else t)
-				row.append({"t": t, "links": [], "x": 0.0})
-			m["floors"].append(row)
-		# 保证第一章有小医仙奇遇
-		if int(r["chapter"]) == 1 and not G.is_char_unlocked("xiaoyixian"):
-			m["floors"][3][0]["t"] = "event"
-			m["floors"][3][0]["ev"] = "yixian"
-		# 连线
-		for f in floors - 1:
-			var a: Array = m["floors"][f]
-			var b: Array = m["floors"][f + 1]
-			for i in a.size():
-				var j := int(round(float(i) / max(1, a.size() - 1) * (b.size() - 1))) if a.size() > 1 else rng.randi_range(0, b.size() - 1)
-				a[i]["links"].append(j)
-				if rng.randf() < 0.4 and b.size() > 1:
-					var j2 := clampi(j + (1 if rng.randf() < 0.5 else -1), 0, b.size() - 1)
-					if not (j2 in a[i]["links"]):
-						a[i]["links"].append(j2)
-			for j in b.size():
-				var has := false
-				for i in a.size():
-					if j in a[i]["links"]:
-						has = true
-				if not has:
-					a[rng.randi_range(0, a.size() - 1)]["links"].append(j)
-	else:
-		m["rooms"] = floors
-	r["map"] = m
-	r["floor"] = 0
-
-static func _roll_type(rng:RandomNumberGenerator, f:int, floors:int) -> String:
-	var w := {"fight": 44, "elite": 10 if f >= 2 else 0, "shop": 10, "event": 16, "alchemy": 8, "rest": 5, "auction": 4 if f >= 3 else 0, "fire": 4 if f >= 3 else 0}
-	var tot := 0
-	for k in w: tot += w[k]
-	var x := rng.randi() % tot
-	for k in w:
-		x -= w[k]
-		if x < 0:
-			return k
-	return "fight"
-
-static func _door_options() -> Array:
-	var r: Dictionary = G.run
-	var ch: Dictionary = D.chapters[int(r["chapter"])]
-	var f: int = int(r["floor"])
-	var total: int = int(ch.get("floors", 12))
-	# 固定剧情房间
-	if int(r["chapter"]) == 2:
-		if f == 4: return [{"t": "midboss", "boss": "medusa"}]
-		if f == 7: return [{"t": "firebeast", "boss": "fire_spirit"}]
-		if f == 10: return [{"t": "elite", "boss": "nalan", "story": "ch2_nalan"}]
-		if f == total - 1: return [{"t": "boss"}]
-		if f == 2 and not G.is_char_unlocked("yunyun"):
-			return [{"t": "event", "ev": "yunyun_meet"}, {"t": "fight", "rw": "art"}]
-	var opts := []
-	var n := 2 + (1 if randf() < 0.5 else 0)
-	var types := ["fight", "fight", "fight", "fight", "elite", "shop", "event", "event", "alchemy", "rest", "auction", "fire"]
-	for i in n:
-		var t: String = types[randi() % types.size()]
-		if t == "elite" and f < 2:
-			t = "fight"
-		var o := {"t": t}
-		if t in ["fight", "elite"]:
-			var rws := ["art", "art", "art", "relic", "relic", "upgrade", "upgrade", "gold", "herb", "move", "gong"]
-			if t == "elite" or randf() < 0.08:
-				rws.append("ult")
-			o["rw"] = rws[randi() % rws.size()]
-		opts.append(o)
-	return opts
-
-# ---------------------------------------------------------------- 地图界面
 ## 从基地出发（静态函数：回调不能绑定在即将被释放的基地场景上）
 static func start_chapter(m, chap:int) -> void:
+	G.run["zone"] = new_zone_state(chap, 0)
+	G.save_run()
 	m.set_scene(StoryBG.make(D.chapters[chap]["biome"]))
-	Dialog.play(m, "ch%d_start" % chap, func(): show_map(m))
+	Dialog.play(m, "ch%d_start" % chap, func(): enter_zone(m))
 
 static func start_endless(m) -> void:
 	enter_room(m, {"type": "endless", "biome": "lava"}, func(_res): results(m, false))
@@ -127,12 +18,31 @@ static func start_bossrush(m) -> void:
 			G.run["crystal_earned"] = 300
 		results(m, res == "win"))
 
+# ---------------------------------------------------------------- 探索地图
+static func new_zone_state(chap:int, i:int) -> Dictionary:
+	var zl: Array = WD.chapter_zones.get(chap, WD.chapter_zones[1])
+	i = clampi(i, 0, zl.size() - 1)
+	return {"i": i, "id": zl[i], "seed": randi(), "done": [], "dead": []}
+
+## 进入（或返回）当前区域
+static func enter_zone(m) -> void:
+	var r: Dictionary = G.run
+	if not r.has("zone") or not (r["zone"] is Dictionary) or not WD.zones.has(r["zone"].get("id", "")):
+		r["zone"] = new_zone_state(int(r["chapter"]), 0)
+	var ex := Explore.new()
+	ex.process_mode = Node.PROCESS_MODE_PAUSABLE
+	ex.setup_zone(m, r["zone"]["id"])
+	m.set_scene(ex)
+	var ch: Dictionary = D.chapters[int(r["chapter"])]
+	Au.music("calm" if WD.zones[r["zone"]["id"]]["kind"] == "town" else ch.get("music", "battle1"))
+	ex.finished.connect(func(res):
+		if res == "dead":
+			dead(m), CONNECT_ONE_SHOT)
+
+## 继续游戏 / 从战斗返回：回到探索地图（渡劫待定时先渡劫）
 static func show_map(m) -> void:
 	var r: Dictionary = G.run
-	if r.get("map", {}).is_empty():
-		gen_map()
 	G.save_run()
-	# 渡劫
 	if r["flags"].get("trib_pending", false):
 		r["flags"]["trib_pending"] = false
 		r["flags"]["trib_done"] = true
@@ -142,108 +52,136 @@ static func show_map(m) -> void:
 					m.toast("渡劫成功", "斗气化翼！身法强化为「斗气化翼」", Color(1, 0.75, 0.3))
 					if r["move"] == "mv_roll":
 						r["move"] = "mv_douqiwing"
-					reward_screen(m, "boss", func(): show_map(m))
+					reward_screen(m, "boss", func(): show_map(m), 0, 6)
 				else:
 					dead(m)))
 		return
-	var ch: Dictionary = D.chapters[int(r["chapter"])]
-	var sc := MapScene.new()
-	m.set_scene(sc)
-	Au.music(ch.get("music", "battle1") if int(r["floor"]) > 0 else "calm")
-	sc.build(m)
+	enter_zone(m)
 
-static func node_selected(m, node:Dictionary) -> void:
-	var r: Dictionary = G.run
-	var ch: Dictionary = D.chapters[int(r["chapter"])]
-	var t: String = node["t"]
-	var biome: String = ch["biome"]
-	if ch.has("biome2") and int(r["floor"]) >= int(ch.get("floors", 10)) / 2:
-		biome = ch["biome2"]
-	var after := func(): advance(m)
-	match t:
-		"fight":
-			enter_room(m, {"type": "fight", "biome": biome}, func(res):
-				if res == "win":
-					reward_screen(m, node.get("rw", "any"), after)
+## 探索地图中需要切换场景的地点：出口 / 洞穴 / 对决 / 首领
+static func explore_poi(m, ex, po:Dictionary, cancel:Callable) -> void:
+	var d: Dictionary = po["def"]
+	var z: Dictionary = G.run["zone"]
+	var zdef: Dictionary = WD.zones[z["id"]]
+	var back := func(): enter_zone(m)
+	match po["t"]:
+		"exit":
+			var zl: Array = WD.chapter_zones[int(G.run["chapter"])]
+			var to: int = int(d.get("to", int(z["i"]) + 1))
+			var nm: String = WD.zones[zl[clampi(to, 0, zl.size() - 1)]]["n"]
+			Screens.confirm(m, "前往 %s？" % nm, "离开后将无法返回「%s」。\n还没去过的地点会错过。" % zdef["n"], "出发", "再看看", func(yes):
+				if yes:
+					G.run["zone"] = new_zone_state(int(G.run["chapter"]), to)
+					G.save_run()
+					m.fade_to(func(): enter_zone(m))
 				else:
-					dead(m))
-		"elite":
-			var boss: String = node.get("boss", ch["elites"][randi() % ch["elites"].size()])
-			var go := func():
-				enter_room(m, {"type": "elite", "boss": boss, "biome": biome}, func(res):
-					if res == "win":
-						if boss == "nalan":
-							G.run["flags"]["nalan_done"] = true
-						reward_screen(m, "boss", after, 60)
-					else:
-						dead(m))
-			if node.has("story"):
-				Dialog.play(m, node["story"], go)
-			else:
-				go.call()
-		"midboss":
-			var mb: String = node.get("boss", ch.get("boss2", ch.get("mid", "wolfking")))
-			var story := "ch2_medusa" if mb == "medusa" else ""
-			var go2 := func():
-				enter_room(m, {"type": "boss", "boss": mb, "biome": "desert" if mb == "medusa" else "forest"}, func(res):
-					if res == "win":
-						if mb == "medusa":
-							G.unlock_ach("ach_medusa")
-							Dialog.play(m, "ch2_medusa_win", func():
-								G.unlock_char("medusa")
-								reward_screen(m, "boss", after, 120))
-						else:
-							reward_screen(m, "boss", after, 100)
-					else:
-						dead(m))
-			if story != "":
-				Dialog.play(m, story, go2)
-			else:
-				go2.call()
-		"firebeast":
-			enter_room(m, {"type": "boss", "boss": node.get("boss", "fire_spirit"), "biome": "lava"}, func(res):
-				if res == "win":
-					Dialog.play(m, "ch2_fire", func():
-						devour_fire(m, "qldx", func(): reward_screen(m, "boss", after, 80)))
+					cancel.call())
+		"cave":
+			Screens.confirm(m, po["n"], "进入后需要连续闯过 %d 个房间，途中无法返回。" % d["rooms"].size(), "进入", "再看看", func(yes):
+				if yes:
+					m.fade_to(func():
+						m.set_scene(StoryBG.make(zdef["biome"]))
+						Dialog.play(m, d.get("story", ""), func(): _cave_room(m, po, 0)))
 				else:
-					dead(m))
+					cancel.call())
+		"duel":
+			var bid: String = d["boss"]
+			Dialog.play(m, d.get("story", ""), func():
+				enter_room(m, {"type": "boss" if d.get("boss_room", false) else "elite", "boss": bid, "biome": zdef["biome"]}, func(res):
+					if res != "win":
+						dead(m)
+						return
+					_zone_done(po["id"])
+					if bid == "nalan":
+						G.run["flags"]["nalan_done"] = true
+					if bid == "medusa":
+						G.unlock_ach("ach_medusa")
+						Dialog.play(m, "ch2_medusa_win", func():
+							G.unlock_char("medusa")
+							reward_screen(m, "boss", back, 120, 6))
+						return
+					reward_screen(m, "boss", back, 80, 6)))
 		"boss":
-			var bid: String = ch["boss"]
-			var st := "ch%d_boss" % int(r["chapter"])
-			Dialog.play(m, st, func():
-				enter_room(m, {"type": "boss", "boss": bid, "biome": ch.get("biome2", biome)}, func(res):
-					if res == "win":
-						if bid == "yunshan":
-							G.unlock_ach("ach_yunshan")
-						chapter_clear(m)
-					else:
-						dead(m)))
-		"shop":
-			Screens.shop(m, after)
-		"event":
-			Screens.event(m, node.get("ev", ""), after)
-		"alchemy":
-			Screens.alchemy_select(m, true, after)
-		"rest":
-			Screens.rest(m, after)
-		"auction":
-			Screens.auction(m, after)
-		"fire":
-			var cands := Rewards.fire_candidates()
-			if cands.is_empty():
-				m.toast("异火已散", "此处的异火气息已经消失", Color(0.7, 0.7, 0.7))
-				reward_screen(m, "any", after)
-			else:
-				var fid: String = cands[randi() % cands.size()]
-				Screens.fire_intro(m, fid, func(): devour_fire(m, fid, after), after)
+			var ch: Dictionary = D.chapters[int(G.run["chapter"])]
+			var bid2: String = ch["boss"]
+			Screens.confirm(m, "挑战首领？", "前方就是本章的首领。\n确定准备好了吗？", "挑战", "再看看", func(yes):
+				if not yes:
+					cancel.call()
+					return
+				m.fade_to(func():
+					m.set_scene(StoryBG.make(ch.get("biome2", zdef["biome"])))
+					Dialog.play(m, "ch%d_boss" % int(G.run["chapter"]), func():
+						enter_room(m, {"type": "boss", "boss": bid2, "biome": ch.get("biome2", zdef["biome"])}, func(res):
+							if res == "win":
+								if bid2 == "yunshan":
+									G.unlock_ach("ach_yunshan")
+								chapter_clear(m)
+							else:
+								dead(m)))))
 		_:
-			after.call()
+			cancel.call()
 
-static func advance(m) -> void:
-	var r: Dictionary = G.run
-	r["floor"] = int(r["floor"]) + 1
+static func _zone_done(id:String) -> void:
+	var z: Dictionary = G.run["zone"]
+	if not (id in z["done"]):
+		z["done"].append(id)
+	z.erase("pos_override")
 	G.save_run()
-	show_map(m)
+
+static func _cave_room(m, po:Dictionary, i:int) -> void:
+	var d: Dictionary = po["def"]
+	var rooms: Array = d["rooms"]
+	if i >= rooms.size():
+		_cave_end(m, po)
+		return
+	var rm: Dictionary = rooms[i]
+	var zdef: Dictionary = WD.zones[G.run["zone"]["id"]]
+	G.run["floor"] = int(G.run["zone"]["i"]) * 3 + i + 2
+	enter_room(m, {"type": rm["type"], "boss": rm.get("boss", ""), "biome": d.get("biome", zdef["biome"])}, func(res):
+		if res != "win":
+			dead(m)
+			return
+		var nxt := func(): _cave_room(m, po, i + 1)
+		if rm["type"] == "elite":
+			reward_screen(m, "boss", nxt, 60, 6)
+		else:
+			reward_screen(m, "any", nxt, 0, 5))
+
+static func _cave_end(m, po:Dictionary) -> void:
+	_zone_done(po["id"])
+	var back := func(): enter_zone(m)
+	var e: String = po["def"].get("end", "")
+	if e.begins_with("canon:"):
+		var cid := e.substr(6)
+		if G.run["char"] == "xiaoyan" and not G.has_skill(cid):
+			m.set_scene(StoryBG.make(WD.zones[G.run["zone"]["id"]]["biome"]))
+			learn_canon(m, cid, back)
+		else:
+			reward_screen(m, "boss", back, 60, 6)
+	elif e.begins_with("fire:"):
+		var fid := e.substr(5)
+		enter_room(m, {"type": "boss", "boss": "fire_spirit", "biome": "lava"}, func(res):
+			if res != "win":
+				dead(m)
+				return
+			Dialog.play(m, "ch2_fire", func():
+				devour_fire(m, fid, func():
+					if G.run["char"] == "xiaoyan" and not G.has_skill("ult_lotus"):
+						learn_canon(m, "ult_lotus", back)
+					else:
+						reward_screen(m, "boss", back, 80, 6))))
+	else:
+		reward_screen(m, "boss", back, 60, 6)
+
+## 原著斗技：播放剧情并获得
+static func learn_canon(m, cid:String, done:Callable) -> void:
+	var cd: Dictionary = WD.canon[cid]
+	Dialog.play(m, cd.get("story", ""), func():
+		G.learn_canon(cid)
+		m.toast("习得原著斗技", D.skills[cid]["n"], Color(1, 0.8, 0.35))
+		Au.sfx("breakthrough", -6)
+		G.save_run()
+		done.call())
 
 static func enter_room(m, cfg:Dictionary, cb:Callable) -> void:
 	var b := Battle.new()
@@ -259,7 +197,7 @@ static func enter_room(m, cfg:Dictionary, cb:Callable) -> void:
 		cb.call(res), CONNECT_ONE_SHOT)
 
 # ---------------------------------------------------------------- 奖励
-static func reward_screen(m, kind:String, done:Callable, gold:int=0) -> void:
+static func reward_screen(m, kind:String, done:Callable, gold:int=0, n:int=5) -> void:
 	var r: Dictionary = G.run
 	if gold > 0:
 		r["gold"] = int(r["gold"]) + int(gold * D.DIFFS[int(r["diff"])]["rew"])
@@ -280,7 +218,6 @@ static func reward_screen(m, kind:String, done:Callable, gold:int=0) -> void:
 			m.toast("获得药材", txt, Color(0.5, 1, 0.5))
 			done.call()
 			return
-	var n := 3
 	var opts := Rewards.options(n, kind if kind in ["art", "relic", "upgrade", "ult", "move", "gong", "boss"] else "any")
 	Screens.choose_reward(m, opts, "选择你的机缘", done)
 
@@ -343,13 +280,11 @@ static func chapter_clear(m) -> void:
 			Screens.confirm(m, "第%d章 通关！" % c, "继续前往 %s·%s（保留当前构筑与境界）？\n或者返回基地结算。" % [D.chapters[c + 1]["n"], D.chapters[c + 1]["t"]], "继续征途", "返回结算", func(yes):
 				if yes:
 					r["chapter"] = c + 1
-					r["map"] = {}
 					r["floor"] = 0
 					r["hp"] = -1
 					var nc: Dictionary = D.chapters[c + 1]
-					r["realm"] = max(int(r["realm"]), int(nc["start_realm"]) * 3)
-					m.set_scene(StoryBG.make(D.chapters[c + 1]["biome"]))
-					Dialog.play(m, "ch%d_start" % (c + 1), func(): show_map(m))
+					r["realm"] = max(int(r["realm"]), int(nc["start_realm"]))
+					start_chapter(m, c + 1)
 				else:
 					results(m, true))
 		else:
@@ -368,7 +303,7 @@ static func results(m, win:bool) -> void:
 			if d["id"] == t:
 				tj += int(d["pt"])
 	var mult: float = D.DIFFS[int(r["diff"])]["rew"] * (1.0 + tj * 0.15)
-	var crystal := int((int(r["floor"]) * 6 + int(r["kills"]) / 4 + int(r.get("crystal_earned", 0)) + int(r["realm"]) * 3) * mult)
+	var crystal := int((int(r["floor"]) * 6 + int(r["kills"]) / 4 + int(r.get("crystal_earned", 0)) + int(G.rpow() * 3)) * mult)
 	if r["mode"] == "endless":
 		crystal += int(r.get("endless_wave", 0)) * 8
 	var contrib := int(r["floor"]) * 3 + (30 if win else 0)
