@@ -21,10 +21,11 @@ for key in sys.argv[2:]:
     files=[i['title'] for i in p.get('images',[]) if not re.search(r'icon|\.gif|\.mp3|\.ogg|2015060816',i['title'],re.I)]
     main=p.get('original',{}).get('source')
     pick=[f for f in files if re.search('manhua|comic',f,re.I)]
-    pick+=[f for f in files if f not in pick][:5]
+    pick+=[f for f in files if f not in pick]
+    pick=pick[:int(os.environ.get('MAXN','6'))]
     urls=[('main',main)] if main else []
     if pick:
-        ii=q(action='query',titles='|'.join(pick[:9]),prop='imageinfo',iiprop='url')
+        ii=q(action='query',titles='|'.join(pick[:48]),prop='imageinfo',iiprop='url')
         for pg in ii.get('query',{}).get('pages',{}).values():
             if 'imageinfo' in pg: urls.append((pg['title'],pg['imageinfo'][0]['url']))
     print(slug,p.get('title'),[u[0] for u in urls],flush=True)
