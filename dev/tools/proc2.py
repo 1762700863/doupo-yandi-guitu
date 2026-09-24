@@ -19,6 +19,25 @@ for n in names:
     d = np.sqrt(((a - bg) ** 2).sum(-1))
     alpha = np.clip((d - 38) / 55.0, 0, 1)
     mask = ndimage.binary_opening(alpha > 0.5, iterations=1)
+    # 多副本检测：按空白列把画面分段，若有 ≥2 段面积相近 → 只保留最左段（附带其左右 60px 内的小碎片）
+    col = mask.sum(0) > 2
+    segs = []; x = 0; W = mask.shape[1]
+    while x < W:
+        if col[x]:
+            x2 = x
+            while x2 < W and col[x2]: x2 += 1
+            segs.append([x, x2, int(mask[:, x:x2].sum())]); x = x2
+        else:
+            x += 1
+    bigs = [sg for sg in segs if sg[2] > max(sg2[2] for sg2 in segs) * 0.45]
+    if len(bigs) >= 2:
+        L, Rr = bigs[0][0], bigs[0][1]
+        lim = bigs[1][0]
+        for sg in segs:
+            if sg[2] < bigs[0][2] * 0.2 and sg[0] < lim and sg[0] - Rr < 60 and sg[1] <= lim:
+                L = min(L, sg[0]); Rr = max(Rr, sg[1])
+        cut = np.zeros_like(mask); cut[:, L:Rr] = True
+        mask = mask & cut; alpha = alpha * cut
     lab, nl = ndimage.label(ndimage.binary_dilation(mask, iterations=25))
     sizes = ndimage.sum(mask, lab, range(1, nl + 1))
     big = [i + 1 for i, s in enumerate(sizes) if s > sizes.max() * 0.5]
