@@ -36,6 +36,8 @@ static func panel(parent:Node, rect:Rect2, bg:Color=Color(-1, 0, 0), border:Colo
 
 static func label(parent:Node, text:String, pos:Vector2, size:int=12, col:Color=Color(0.95, 0.92, 0.85), width:float=-1, align:int=HORIZONTAL_ALIGNMENT_LEFT) -> Label:
 	var l := Label.new()
+	size = max(size, 10)
+	l.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
 	l.text = text
 	l.position = pos
 	l.add_theme_font_override("font", G.font)
@@ -54,6 +56,8 @@ static func label(parent:Node, text:String, pos:Vector2, size:int=12, col:Color=
 static func button(parent:Node, text:String, rect:Rect2, cb:Callable, col:Color=Color(-1, 0, 0), size:int=12) -> Button:
 	var th := theme_cols()
 	var b := Button.new()
+	size = max(size, 10)
+	b.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
 	b.text = text
 	b.position = rect.position
 	b.size = rect.size
@@ -98,7 +102,7 @@ static func tex_rect(parent:Node, tex:Texture2D, rect:Rect2, keep:bool=true) -> 
 	t.position = rect.position
 	t.size = rect.size
 	t.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED if keep else TextureRect.STRETCH_SCALE
-	t.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	t.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR if tex and tex.get_height() > 100 else CanvasItem.TEXTURE_FILTER_NEAREST
 	t.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	parent.add_child(t)
 	return t

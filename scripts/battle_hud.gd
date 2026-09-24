@@ -81,6 +81,13 @@ func _process(delta:float) -> void:
 class HudDraw extends Control:
 	var h
 	func _txt(pos:Vector2, s:String, sz:int, col:Color, align:int=HORIZONTAL_ALIGNMENT_LEFT, w:float=-1, outline:int=4) -> void:
+		sz = max(sz, 10)
+		if w < 0 and align == HORIZONTAL_ALIGNMENT_RIGHT:
+			pos.x -= G.font.get_string_size(s, HORIZONTAL_ALIGNMENT_LEFT, -1, sz).x
+			align = HORIZONTAL_ALIGNMENT_LEFT
+		elif w < 0 and align == HORIZONTAL_ALIGNMENT_CENTER:
+			pos.x -= G.font.get_string_size(s, HORIZONTAL_ALIGNMENT_LEFT, -1, sz).x * 0.5
+			align = HORIZONTAL_ALIGNMENT_LEFT
 		draw_string_outline(G.font, pos, s, align, w, sz, outline, Color(0, 0, 0, col.a * 0.9))
 		draw_string(G.font, pos, s, align, w, sz, col)
 
@@ -92,7 +99,7 @@ class HudDraw extends Control:
 
 	func _draw() -> void:
 		var b = h.b
-		if b == null or b.player == null:
+		if b == null or b.player == null or G.run.is_empty():
 			return
 		var p: Player = b.player
 		var th := UI.theme_cols()

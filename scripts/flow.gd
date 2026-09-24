@@ -334,6 +334,7 @@ static func chapter_clear(m) -> void:
 					r["hp"] = -1
 					var nc: Dictionary = D.chapters[c + 1]
 					r["realm"] = max(int(r["realm"]), int(nc["start_realm"]) * 3)
+					m.set_scene(StoryBG.make(D.chapters[c + 1]["biome"]))
 					Dialog.play(m, "ch%d_start" % (c + 1), func(): show_map(m))
 				else:
 					results(m, true))

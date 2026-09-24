@@ -65,7 +65,7 @@ func _draw() -> void:
 		col.a = 0.6 + 0.4 * sin(t * 5 + e["ph"])
 		draw_rect(Rect2(e["p"], Vector2(e["s"], e["s"])), col)
 	# 标题
-	var f: Font = G.font
+	var f: Font = G.font_pixel
 	var title := "斗破苍穹"
 	for o in [Vector2(3, 3), Vector2(-2, 0), Vector2(2, 0), Vector2(0, -2), Vector2(0, 2)]:
 		draw_string(f, Vector2(100, 170) + o, title, HORIZONTAL_ALIGNMENT_LEFT, -1, 64, Color(0.25, 0.05, 0.02, 0.9))

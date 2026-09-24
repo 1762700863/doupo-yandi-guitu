@@ -29,6 +29,8 @@ func setup(battle, id:String) -> void:
 	add_child(spr)
 
 func _physics_process(delta:float) -> void:
+	if G.run.is_empty():
+		return
 	if b == null or b.paused_logic or b.player == null:
 		return
 	t += delta

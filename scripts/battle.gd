@@ -390,6 +390,8 @@ func player_died() -> void:
 
 # ---------------------------------------------------------------- 主循环
 func _physics_process(delta:float) -> void:
+	if G.run.is_empty():
+		return
 	if paused_logic:
 		return
 	time_in_room += delta
@@ -439,16 +441,24 @@ func _physics_process(delta:float) -> void:
 		_ambient()
 	bulletlayer.queue_redraw()
 
-func _process(delta:float) -> void:
-	if hitstop_t > 0:
-		hitstop_t -= delta / max(Engine.time_scale, 0.01)
-		if hitstop_t <= 0:
-			Engine.time_scale = 1.0
+var hitstop_end := 0
+
+func _process(_delta:float) -> void:
+	if hitstop_end > 0 and Time.get_ticks_msec() >= hitstop_end:
+		hitstop_end = 0
+		hitstop_t = 0
+		Engine.time_scale = 1.0
+
+func _exit_tree() -> void:
+	Engine.time_scale = 1.0
 
 func do_hitstop(t:float) -> void:
 	if not G.settings["hitstop"]:
 		return
+	if ended:
+		return
 	hitstop_t = t
+	hitstop_end = Time.get_ticks_msec() + int(min(t, 0.3) * 1000)
 	Engine.time_scale = 0.05
 
 func shake(v:float) -> void:

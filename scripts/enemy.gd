@@ -96,6 +96,8 @@ func setup(battle, eid:String, boss:bool, mult:float) -> void:
 	z_index = 0
 
 func _physics_process(delta:float) -> void:
+	if G.run.is_empty():
+		return
 	if dead or b.paused_logic:
 		return
 	t += delta

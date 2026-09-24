@@ -670,4 +670,5 @@ func _start_run() -> void:
 	var chap: int = sel["chapter"]
 	G.new_run(sel["char"], chap, sel["atk"], sel["comp"], sel["diff"], sel["tj"].duplicate())
 	m.fade_to(func():
+		m.set_scene(StoryBG.make(D.chapters[chap]["biome"]))
 		Dialog.play(m, "ch%d_start" % chap, func(): Flow.show_map(m)))

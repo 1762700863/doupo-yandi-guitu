@@ -31,6 +31,77 @@ func _ready() -> void:
 	title_screen()
 	_autotest()
 
+var args_g := {}
+func _collect_btns(n:Node, out:Array) -> void:
+	for c in n.get_children():
+		if c is Button and c.is_visible_in_tree() and not c.disabled:
+			out.append(c)
+		_collect_btns(c, out)
+
+func _autoplay() -> void:
+	while true:
+		await get_tree().create_timer(0.35, true, false, true).timeout
+		var b := battle()
+		if b and is_instance_valid(b.player):
+			b.player.hp = b.player.st["hp_max"]
+			if args_g.get("real", "") != "1":
+				for e in b.enemies.duplicate():
+					if is_instance_valid(e) and not e.get("dead"):
+						b.deal(e, {"dmg": e.hp_max * 0.26, "elem": "fire"}, b.player.global_position)
+			else:
+				# 模拟玩家：朝最近敌人移动并攻击（通过输入动作）
+				var ne = b.nearest_enemy(b.player.global_position, 2000)
+				if ne:
+					var dv: Vector2 = ne.global_position - b.player.global_position
+					Input.action_release("left"); Input.action_release("right"); Input.action_release("up"); Input.action_release("down")
+					if dv.length() > 90:
+						if dv.x > 20: Input.action_press("right")
+						if dv.x < -20: Input.action_press("left")
+						if dv.y > 20: Input.action_press("down")
+						if dv.y < -20: Input.action_press("up")
+					Input.action_press("attack")
+					for a in ["art1", "art2", "art3", "art4", "ult", "ult2", "special"]:
+						if randf() < 0.3:
+							Input.action_press(a)
+						else:
+							Input.action_release(a)
+		for d in get_tree().get_nodes_in_group("dialog"):
+			d._advance()
+		if get_tree().get_nodes_in_group("dialog").size() > 0:
+			continue
+		var btns := []
+		var kids := ui_layer.get_children().filter(func(k): return not k.is_queued_for_deletion())
+		kids.reverse()
+		for k in kids:
+			var tmp := []
+			_collect_btns(k, tmp)
+			tmp = tmp.filter(func(b): return not (b.text in ["设置", "标题", "功法", "退出游戏", "放弃本局"]))
+			if tmp.size() > 0:
+				btns = tmp
+				break
+		var pri := ["继续", "离开", "返回基地", "不要了", "吞噬它", "放弃（", "关闭"]
+		var pick: Button = null
+		for bt in btns:
+			for k in pri:
+				if bt.text.begins_with(k) or bt.text == "继续征途":
+					pick = bt
+					break
+			if pick: break
+		if pick == null:
+			for bt in btns:
+				if bt.text == "":
+					pick = bt
+					break
+		if pick == null:
+			for bt in btns:
+				if not (bt.text in ["设置", "标题", "功法", "退出游戏", "放弃本局", "+10", "+30", "+100"]):
+					pick = bt
+					break
+		if pick:
+			if false: print("STATE scene=", current.get_script().get_global_name() if current and current.get_script() else "?", " fade=", snapped(fade.color.a, 0.01), " fading=", fading, " paused=", get_tree().paused, " ui=", ui_layer.get_child_count())
+			print("AUTO_PICK [", pick.text.replace("\n", " ").substr(0, 20), "] floor=", G.run.get("floor", -1), " ch=", G.run.get("chapter", -1))
+			pick.pressed.emit()
+
 # ---------------------------------------------------------------- 自动测试（命令行 -- scene=hub shot=/path.png t=3）
 func _autotest() -> void:
 	var args := {}
@@ -46,6 +117,32 @@ func _autotest() -> void:
 	match sc:
 		"hub":
 			hub()
+		"chclear":
+			G.new_run(c, 1, D.chars[c]["atks"][0], "yaolao", 1, [])
+			Flow.show_map(self)
+			await get_tree().create_timer(0.5).timeout
+			Flow.chapter_clear(self)
+		"clickmap":
+			G.new_run(c, int(args.get("ch", "1")), D.chars[c]["atks"][0], "yaolao", 1, [])
+			Flow.show_map(self)
+			await get_tree().create_timer(1.0).timeout
+			var sc2 = current
+			var pos: Vector2
+			if G.run["map"]["type"] == "branch":
+				pos = sc2.nodes_pos["0_0"]
+			else:
+				pos = sc2.nodes_pos["door_0"].get_center()
+			var win_pos := pos * (Vector2(get_window().size) / Vector2(960, 540))
+			for pr in [true, false]:
+				var ev := InputEventMouseButton.new()
+				ev.button_index = MOUSE_BUTTON_LEFT
+				ev.pressed = pr
+				ev.position = win_pos
+				ev.global_position = win_pos
+				Input.parse_input_event(ev)
+				await get_tree().process_frame
+			await get_tree().create_timer(1.5).timeout
+			print("AFTER_CLICK scene=", current.get_class(), " ", current is Battle)
 		"flow":
 			G.new_run(c, int(args.get("ch", "1")), D.chars[c]["atks"][0], "yaolao", 1, [])
 			Flow.show_map(self)
@@ -119,6 +216,9 @@ func _autotest() -> void:
 			hub()
 			await get_tree().create_timer(0.3).timeout
 			current._open(args.get("b", "train"))
+	args_g = args
+	if args.get("auto", "") == "1":
+		_autoplay()
 	var t := float(args.get("t", "3"))
 	var shots: String = args.get("shot", "")
 	if shots != "":
@@ -175,7 +275,7 @@ func _fade_out() -> void:
 	if fade_tw and fade_tw.is_valid():
 		fade_tw.kill()
 	fade.color.a = max(fade.color.a, 0.6)
-	fade_tw = create_tween()
+	fade_tw = create_tween().set_ignore_time_scale(true)
 	fade_tw.tween_property(fade, "color:a", 0.0, 0.35)
 
 ## 渐黑 → 执行回调 → 无论回调是否切换场景，都保证渐亮（修复黑屏）
@@ -185,7 +285,7 @@ func fade_to(cb:Callable) -> void:
 	fading = true
 	if fade_tw and fade_tw.is_valid():
 		fade_tw.kill()
-	fade_tw = create_tween()
+	fade_tw = create_tween().set_ignore_time_scale(true)
 	fade_tw.tween_property(fade, "color:a", 1.0, 0.22)
 	fade_tw.tween_callback(func():
 		fading = false
@@ -193,6 +293,8 @@ func fade_to(cb:Callable) -> void:
 		_fade_out())
 
 func _process(d:float) -> void:
+	if battle() == null and Engine.time_scale != 1.0:
+		Engine.time_scale = 1.0
 	# 保险：黑幕停留超过1.2秒自动揭开
 	if fade.color.a > 0.9 and not fading:
 		black_t += d
@@ -204,7 +306,7 @@ func _process(d:float) -> void:
 func ui_root() -> Control:
 	var c := Control.new()
 	c.size = Vector2(960, 540)
-	c.mouse_filter = Control.MOUSE_FILTER_PASS
+	c.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	ui_layer.add_child(c)
 	return c
 
@@ -228,18 +330,41 @@ func title_screen() -> void:
 	set_scene(TitleScene.new())
 	Au.music("hub")
 	var root := ui_root()
-	var y := 300.0
+	var y := 290.0
 	var has_run := G.has_run()
+	var first: Button
 	if has_run:
-		UI.button(root, "继续征途", Rect2(130, y, 180, 32), func(): _continue_run(), Color(1, 0.7, 0.3), 16)
-		y += 38
-	UI.button(root, "开始游戏", Rect2(130, y, 180, 32), func(): _start_flow(), Color(1, 0.6, 0.3), 16)
-	y += 38
-	UI.button(root, "设置", Rect2(130, y, 180, 32), func(): Screens.settings(self, func(): title_screen()), Color(-1, 0, 0), 16)
-	y += 38
-	UI.button(root, "退出", Rect2(130, y, 180, 32), func(): get_tree().quit(), Color(0.6, 0.6, 0.6), 16)
-	UI.label(root, "v0.1.1 · 同人作品，仅供个人娱乐 · 字体：缝合像素字体 (OFL)", Vector2(10, 520), 8, Color(0.6, 0.6, 0.6))
+		first = UI.button(root, "继续游戏", Rect2(130, y, 180, 34), func(): _continue_run(), Color(1, 0.75, 0.3), 16)
+		var r_info := _run_summary()
+		if r_info != "":
+			UI.label(root, r_info, Vector2(320, y + 8), 12, Color(0.9, 0.85, 0.7))
+		y += 40
+	var nb := UI.button(root, "新游戏", Rect2(130, y, 180, 34), func():
+		if has_run:
+			Screens.confirm(self, "开始新的征途？", "当前有一局未完成的征途（已自动保存）。\n开始新征途将放弃它（结算已获得的奖励）。", "放弃并开始", "取消", func(yes):
+				if yes:
+					G.clear_run()
+					_start_flow())
+		else:
+			_start_flow(), Color(1, 0.6, 0.3), 16)
+	if first == null:
+		first = nb
+	y += 40
+	UI.button(root, "设置", Rect2(130, y, 180, 34), func(): Screens.settings(self, func(): title_screen()), Color(-1, 0, 0), 16)
+	y += 40
+	UI.button(root, "退出游戏", Rect2(130, y, 180, 34), func(): get_tree().quit(), Color(0.6, 0.6, 0.6), 16)
+	first.call_deferred("grab_focus")
+	UI.label(root, "v0.1.2 · 同人作品，仅供个人娱乐 · 字体：霞鹜文楷 / 缝合像素字体 (OFL)", Vector2(10, 520), 8, Color(0.6, 0.6, 0.6))
 	UI.label(root, "WASD移动 鼠标瞄准 左键普攻 Q/E/R/F斗技 C/X大招 空格身法 Tab功法面板 Esc暂停 F11全屏", Vector2(0, 500), 8, Color(0.8, 0.75, 0.65), 960, HORIZONTAL_ALIGNMENT_CENTER)
+
+func _run_summary() -> String:
+	var f := FileAccess.open(G.RUN_PATH, FileAccess.READ)
+	if f == null:
+		return ""
+	var d = JSON.parse_string(f.get_as_text())
+	if not (d is Dictionary) or not d.has("char"):
+		return ""
+	return "%s · %s · 第%d层" % [D.chars[d["char"]]["n"], D.chapters[int(d["chapter"])]["t"], int(d.get("floor", 0)) + 1]
 
 func _start_flow() -> void:
 	if not G.meta["prologue_done"]:
@@ -255,6 +380,8 @@ func _continue_run() -> void:
 
 func _start_prologue() -> void:
 	G.new_run("xiaoyan", 0, "atk_flame", "", 1, [])
+	set_scene(StoryBG.make("void"))
+	Au.music("prologue")
 	Dialog.play(self, "prologue_start", func():
 		Flow.enter_room(self, {"type": "fight", "biome": "void"}, func(res):
 			if res == "win":
@@ -264,6 +391,7 @@ func _start_prologue() -> void:
 				_prologue_end()))
 
 func _prologue_end() -> void:
+	set_scene(StoryBG.make("void"))
 	G.meta["prologue_done"] = true
 	G.save_meta()
 	G.clear_run()

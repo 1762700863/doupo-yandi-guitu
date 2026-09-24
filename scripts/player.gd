@@ -196,6 +196,8 @@ func cd_of(id:String) -> float:
 
 # ---------------------------------------------------------------- 循环
 func _physics_process(delta:float) -> void:
+	if G.run.is_empty():
+		return
 	if dead or b == null or b.paused_logic:
 		return
 	_timers(delta)

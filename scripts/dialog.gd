@@ -33,6 +33,7 @@ static func lines(m, ls:Array, done:Callable) -> void:
 	root.add_child(d)
 
 func _ready() -> void:
+	add_to_group("dialog")
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	size = Vector2(960, 540)
 	mouse_filter = Control.MOUSE_FILTER_STOP
@@ -48,7 +49,7 @@ func _ready() -> void:
 		p.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 		p.size = Vector2(300, 400)
 		p.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		p.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		p.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
 		add_child(p)
 	por_l.position = Vector2(20, 110)
 	por_r.position = Vector2(640, 110)

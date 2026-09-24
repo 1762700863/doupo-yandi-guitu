@@ -10,10 +10,12 @@ var settings := {}
 
 var tex_cache := {}
 var font: FontFile
+var font_pixel: FontFile
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
-	font = load("res://assets/fonts/fusion.ttf")
+	font = load("res://assets/fonts/wenkai.ttf")
+	font_pixel = load("res://assets/fonts/fusion.ttf")
 	_default_settings()
 	load_meta()
 	apply_settings()
@@ -40,7 +42,7 @@ func _default_settings() -> void:
 	settings = {
 		"vol_master": 0.8, "vol_music": 0.3, "vol_sfx": 0.8, "vol_voice": 0.9,
 		"fx": 1.0, "shake": true, "hitstop": true, "dmgnum": true,
-		"fullscreen": false, "fps": 144, "keys": {},
+		"fullscreen": true, "fps": 144, "keys": {},
 	}
 
 func apply_settings() -> void:
@@ -168,6 +170,9 @@ func _migrate_settings() -> void:
 	if int(settings.get("mver", 0)) < 1:
 		settings["mver"] = 1
 		settings["vol_music"] = min(float(settings.get("vol_music", 0.3)), 0.3)
+	if int(settings.get("mver", 0)) < 2:
+		settings["mver"] = 2
+		settings["fullscreen"] = true
 
 func save_meta() -> void:
 	var data := meta.duplicate(true)
