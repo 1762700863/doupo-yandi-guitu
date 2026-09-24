@@ -456,7 +456,8 @@ func toast(title:String, sub:String, col:Color) -> void:
 # ---------------------------------------------------------------- 标题
 func title_screen() -> void:
 	set_scene(TitleScene.new())
-	Au.music("hub")
+	Au.clear_stack()
+	Au.music("title")
 	var root := ui_root()
 	var y := 290.0
 	var progress := G.has_progress()
@@ -528,6 +529,7 @@ func _prologue_end() -> void:
 	Dialog.play(self, "prologue_end", func(): fade_to(func(): hub()))
 
 func hub() -> void:
+	Au.clear_stack()
 	if G.run.get("mode", "") == "":
 		G.clear_run()
 	set_scene(HubScene.new())

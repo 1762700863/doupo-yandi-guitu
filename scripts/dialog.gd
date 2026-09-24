@@ -14,6 +14,26 @@ var box: Panel
 var hint: Label
 var cur_text := ""
 var left_speaker := ""
+var theme_pushed := false
+
+## 剧情专属曲：取出场最多、且有专属曲的角色（萧炎除外；萧炎独白不切换）
+static func _apply_theme(ls:Array) -> bool:
+	if ls.size() < 3 or not Au.calm_now():
+		return false
+	var cnt := {}
+	for l in ls:
+		if l is Array and l.size() >= 3:
+			var sid: String = str(l[0])
+			if sid != "xiaoyan" and Au.theme_ctx(sid) != "":
+				cnt[sid] = int(cnt.get(sid, 0)) + 1
+	var best := ""
+	for k in cnt:
+		if best == "" or int(cnt[k]) > int(cnt[best]):
+			best = k
+	if best == "":
+		return false
+	Au.push(Au.theme_ctx(best))
+	return true
 
 static func play(m, key:String, done:Callable) -> void:
 	var ls: Array = D.story.get(key, [])
@@ -26,6 +46,7 @@ static func play(m, key:String, done:Callable) -> void:
 
 static func lines(m, ls:Array, done:Callable) -> void:
 	var d := Dialog.new()
+	d.theme_pushed = _apply_theme(ls)
 	d.lines_ = ls
 	d.done_cb = done
 	var root: Control = m.ui_root()
@@ -126,6 +147,8 @@ func _finish() -> void:
 	set_process(false)
 	var root := get_parent()
 	root.queue_free()
+	if theme_pushed:
+		Au.pop()
 	done_cb.call()
 
 func _gui_input(e:InputEvent) -> void:

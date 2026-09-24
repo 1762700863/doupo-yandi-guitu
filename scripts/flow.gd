@@ -34,7 +34,8 @@ static func enter_zone(m) -> void:
 	ex.setup_zone(m, r["zone"]["id"])
 	m.set_scene(ex)
 	var ch: Dictionary = D.chapters[int(r["chapter"])]
-	Au.music("calm" if WD.zones[r["zone"]["id"]]["kind"] == "town" else ch.get("music", "battle1"))
+	Au.clear_stack()
+	Au.music(Au.zone_ctx(r["zone"]["id"]))
 	ex.finished.connect(func(res):
 		if res == "dead":
 			dead(m), CONNECT_ONE_SHOT)
@@ -81,6 +82,7 @@ static func explore_poi(m, ex, po:Dictionary, cancel:Callable) -> void:
 				if yes:
 					m.fade_to(func():
 						m.set_scene(StoryBG.make(zdef["biome"]))
+						Au.music("cave")
 						Dialog.play(m, d.get("story", ""), func(): _cave_room(m, po, 0)))
 				else:
 					cancel.call())
@@ -188,9 +190,18 @@ static func enter_room(m, cfg:Dictionary, cb:Callable) -> void:
 	b.process_mode = Node.PROCESS_MODE_PAUSABLE
 	b.setup(m, cfg)
 	m.set_scene(b)
-	if cfg["type"] != "boss":
-		var ch: Dictionary = D.chapters[int(G.run["chapter"])]
-		Au.music(ch.get("music", "battle1"))
+	Au.clear_stack()
+	match cfg["type"]:
+		"boss":
+			pass  # Battle._start_room 按 Boss 播放专属战曲
+		"elite", "trial":
+			var bid: String = cfg.get("boss", "")
+			Au.music(Au.boss_ctx(bid) if Au.LISTS.has("boss_" + bid) else "elite")
+		_:
+			if int(G.run.get("chapter", 1)) == 0:
+				Au.music("theme_yandi")
+			else:
+				Au.music(Au.battle_ctx(cfg.get("biome", "")))
 	b.finished.connect(func(res):
 		if is_instance_valid(b.player) and not b.player.dead:
 			G.run["hp"] = b.player.hp
@@ -266,6 +277,8 @@ static func chapter_clear(m) -> void:
 		G.meta["chapters_cleared"].append(c)
 	r["crystal_earned"] = int(r.get("crystal_earned", 0)) + 80 * c
 	G.unlock_ach("ach_ch%d" % c)
+	Au.clear_stack()
+	Au.music("clear")
 	if r["tianjie"].size() >= 5:
 		G.unlock_ach("ach_tianjie5")
 	Dialog.play(m, "ch%d_end" % c, func():

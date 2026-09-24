@@ -533,15 +533,15 @@ func _use_poi(po:Dictionary) -> void:
 			overlay(func(done): Screens.event(m, po["def"].get("ev", ""), done))
 		"rest":
 			_mark_done(po)
-			overlay(func(done): Screens.rest(m, done))
+			overlay(_with_music("rest", func(done): Screens.rest(m, done)))
 		"shop":
-			overlay(func(done): Screens.shop(m, done))
+			overlay(_with_music("shop", func(done): Screens.shop(m, done)))
 		"auction":
 			_mark_done(po)
-			overlay(func(done): Screens.auction(m, done))
+			overlay(_with_music("shop", func(done): Screens.auction(m, done)))
 		"alchemy":
 			_mark_done(po)
-			overlay(func(done): Screens.alchemy_select(m, true, done))
+			overlay(_with_music("alchemy", func(done): Screens.alchemy_select(m, true, done)))
 		"story":
 			var cid: String = po["def"].get("canon", "")
 			if G.run["char"] == "xiaoyan" and cid != "" and not G.has_skill(cid):
@@ -554,6 +554,14 @@ func _use_poi(po:Dictionary) -> void:
 		"cave", "duel", "boss", "exit":
 			_save()
 			overlay(func(done): Flow.explore_poi(m, self, po, done))
+
+## 打开商店/修炼/炼药等界面时临时切换音乐，关闭后淡回区域曲并续播
+func _with_music(c:String, f:Callable) -> Callable:
+	return func(done:Callable):
+		Au.push(c)
+		f.call(func():
+			Au.pop()
+			done.call())
 
 func _offer_pick() -> void:
 	if pending_picks.is_empty() or busy:

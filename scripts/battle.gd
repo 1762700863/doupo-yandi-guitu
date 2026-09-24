@@ -220,7 +220,7 @@ func _start_room() -> void:
 			var e2 := spawn_enemy(bid2, arena.get_center() + Vector2(0, -150), _mult(), true)
 			boss_ref = e2
 			waves_left = 0
-			Au.music("boss")
+			Au.music(Au.boss_ctx(bid2))
 		"endless":
 			endless_wave = 0
 			waves_left = 999
@@ -243,7 +243,7 @@ func _next_rush_boss() -> void:
 	var bid: String = boss_queue.pop_front()
 	boss_ref = spawn_enemy(bid, arena.get_center() + Vector2(0, -150), 1.0 + (4 - boss_queue.size()) * 0.15, true)
 	H.show_boss(boss_ref)
-	Au.music("boss")
+	Au.music(Au.boss_ctx(bid))
 
 func _mult() -> float:
 	var f: int = int(G.run.get("floor", 0))

@@ -43,7 +43,7 @@ func _ready() -> void:
 	title_l = UI.label(self, "吞噬 · " + f["n"], Vector2(0, 16), 24, col.lightened(0.2), 960, HORIZONTAL_ALIGNMENT_CENTER)
 	UI.label(self, "移动鼠标 或 A/D 旋转斗气护盾，挡住反噬的火流，守住心脉！", Vector2(0, 50), 12, Color(0.95, 0.9, 0.8), 960, HORIZONTAL_ALIGNMENT_CENTER)
 	Au.sfx("whoosh_fire")
-	Au.music("boss")
+	Au.push("fire")
 
 func _process(d:float) -> void:
 	if over:
@@ -120,8 +120,7 @@ func _end(ok:bool) -> void:
 		Au.sfx("fail")
 	UI.label(self, "炼化成功！" if ok else "反噬失控……", Vector2(0, 460), 24, col if ok else Color(1, 0.3, 0.3), 960, HORIZONTAL_ALIGNMENT_CENTER)
 	await get_tree().create_timer(1.6).timeout
-	var ch: Dictionary = D.chapters[int(G.run["chapter"])]
-	Au.music(ch.get("music", "battle1"))
+	Au.pop()
 	get_parent().queue_free()
 	cb.call(ok)
 

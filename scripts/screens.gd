@@ -528,10 +528,11 @@ static func fire_replace(m, fid:String, cb:Callable) -> void:
 # ---------------------------------------------------------------- 结算
 static func results(m, s:Dictionary, r:Dictionary) -> void:
 	m.set_scene(Node2D.new())
-	Au.music("calm")
 	var root: Control = m.ui_root()
 	UI.dim(root, 1.0)
 	var win: bool = s["win"]
+	Au.clear_stack()
+	Au.music("victory" if win else "defeat")
 	var col := Color(1, 0.8, 0.4) if win else Color(0.9, 0.35, 0.3)
 	UI.label(root, "征途告捷" if win else "陨 落", Vector2(0, 40), 24, col, 960, HORIZONTAL_ALIGNMENT_CENTER)
 	if not win:
