@@ -10,7 +10,8 @@ from scipy import ndimage
 R = '/var/tmp/w/repo'
 SRC = R + '/dev/art_src'; OUT = R + '/assets'
 H = {'xiaoyan': 60, 'xuner': 58, 'medusa': 66, 'yunyun': 60, 'xiaoyixian': 58, 'yaolao': 64, 'yandi': 70, 'hun_tiandi': 72,
-     'nalan': 60, 'e_wolf': 44, 'b_yunshan': 64}
+     'nalan': 60, 'e_wolf': 44, 'b_yunshan': 70, 'b_wolfking': 88, 'e_snake': 62, 'e_disciple': 58,
+     'e_bandit': 58, 'e_soul': 60}
 names = sys.argv[1:] or [os.path.basename(f)[:-4] for f in glob.glob(SRC + '/*.png') if not os.path.basename(f).startswith('poi_')]
 for n in names:
     a = np.array(Image.open(f'{SRC}/{n}.png').convert('RGB')).astype(float)
@@ -63,7 +64,7 @@ for n in names:
         mn = np.minimum(sub[..., 0], sub[..., 2])
         mag = np.clip((mn - sub[..., 1] - 70) / 60.0, 0, 1) * (np.abs(sub[..., 0] - sub[..., 2]) < 90)
         al = al * (1 - mag)
-    if n in ('yunyun', 'yaolao'):   # 半透明风环/魂光被品红底污染 → 还原为冷白色
+    if n in ('yunyun', 'yaolao', 'e_disciple', 'e_wolf'):   # 半透明风环/魂光被品红底污染 → 还原为冷白色
         R, G, B = sub[..., 0], sub[..., 1], sub[..., 2]
         hz = (R > G + 12) & (B > G + 12) & (R >= B * 0.75) & (B >= R * 0.6)
         if n == 'yaolao':
