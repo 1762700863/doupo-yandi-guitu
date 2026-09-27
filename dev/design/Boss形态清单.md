@@ -103,3 +103,4 @@
 
 | 魂元天 | 449–450 | 1 形态（人形）；死寂之门=招式特效 | 已画 hunyuantian |
 | 四方死寂大阵（魂元天+魂族三老祖） | 451–452 | 四人阵Boss（hunyuantian + hun_laozu_a/b/c），四扇死寂之门=特效；盟友古元/炎烬/雷赢阵外助战 | 已画 |
+| （命名）四方死寂大阵成员 | 451–452 | 魂元天 hunyuantian；魂生天 hun_laozu_c；魂尧 hun_laozu_b；魂族老祖 hun_laozu_a | — |
